@@ -51,6 +51,14 @@ function normalizeTeam(value,aliases) {
   name=name.split(' ').filter(s=>!['fc','cf','afc','sc','ac','club','futbol','football'].includes(s)).join(' ');
   return clean(aliases[name]||name);
 }
+function matchesSearchHeader(text,target,aliases){
+ let teams=String(text||'').trim().split(/\s+v(?:s\.?)?\s+/i);
+ if(teams.length!==2){
+  const lines=String(text||'').split('\n').map(s=>s.trim()).filter(Boolean);
+  teams=lines.length===2?lines:lines.length===3&&/^v(?:s\.?)?$/i.test(lines[1])?[lines[0],lines[2]]:[];
+ }
+ return teams.length===2&&normalizeTeam(teams[0],aliases)===target.canonical_home&&normalizeTeam(teams[1],aliases)===target.canonical_away;
+}
 function enhancedMarketControl(payload) {
   const main=document.querySelector('[role="main"]');
   if(!main)return null;
@@ -96,8 +104,7 @@ async function scanTarget(target,aliases) {
     // Avoid carrying an input or message channel across document navigation.
     const find=()=>[...document.querySelectorAll('*')].filter(row=>{
       if(row.getClientRects().length===0)return false;
-      const teams=(row.innerText||'').trim().split(/\s+v\s+/i);
-      return teams.length===2 && normalizeTeam(teams[0],aliases)===target.canonical_home && normalizeTeam(teams[1],aliases)===target.canonical_away;
+      return matchesSearchHeader(row.innerText,target,aliases);
     }).filter(row=>![...row.children].some(child=>child.innerText===row.innerText));
     const rows=await waitFor(()=>{const found=find();return found.length?found:null;},30000);
     if(rows.length!==1)return {ok:false,reason:'La búsqueda no identifica un único partido.'};

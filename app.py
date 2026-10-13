@@ -138,6 +138,7 @@ TEAM_ALIASES = {
     "emiratos arabes unidos": "emiratos arabes unidos",
     "new zealand": "nueva zelanda", "nueva zelanda": "nueva zelanda",
     # Frequent club variants
+    "bod glimt": "bodo glimt", "lask linz": "lask", "as roma": "roma",
     "man utd": "manchester united", "manchester utd": "manchester united",
     "man city": "manchester city", "manchester city fc": "manchester city",
     "psg": "paris saint germain", "paris sg": "paris saint germain",

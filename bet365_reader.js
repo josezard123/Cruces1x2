@@ -1,3 +1,13 @@
+function bet365DateLabel(label,now=new Date()) {
+ const clean=String(label||'').trim().toLowerCase().replace(/\s+/g,' ');
+ const explicit=/^(?:(?:lun|mar|mi[eé]|jue|vie|s[aá]b|dom|mon|tue|wed|thu|fri|sat|sun)\.?\s+)?(\d{1,2})\s+(ene|jan|feb|mar|abr|apr|may|jun|jul|ago|aug|sep|oct|nov|dic|dec)\.?\s+(?:(\d{4})\s+)?(\d{1,2}):(\d{2})$/i.exec(clean);
+ if(explicit){if(+explicit[4]>23||+explicit[5]>59)return null;const result=[explicit[0],explicit[1],explicit[2],explicit[4],explicit[5]];if(explicit[3])result.year=+explicit[3];return result;}
+ const relative=/^(hoy|today|ma[nñ]ana|tomorrow)\s+(\d{1,2}):(\d{2})$/.exec(clean);
+ if(!relative||+relative[2]>23||+relative[3]>59)return null;
+ const day=new Date(now);if(['mañana','manana','tomorrow'].includes(relative[1]))day.setDate(day.getDate()+1);
+ const months=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+ const result=[clean,String(day.getDate()),months[day.getMonth()],relative[2],relative[3]];result.year=day.getFullYear();return result;
+}
 function readBet365Result() {
   if (location.hostname !== 'www.bet365.es') throw new Error('Abre Bet365 España.');
   if (Intl.DateTimeFormat().resolvedOptions().timeZone !== 'Europe/Madrid')
@@ -5,8 +15,9 @@ function readBet365Result() {
   const {league,date,teams,odds,enhanced_odds}=readBet365VisibleMarket();
   const months = {ene:0,jan:0,feb:1,mar:2,abr:3,apr:3,may:4,jun:5,jul:6,ago:7,aug:7,sep:8,oct:9,nov:10,dic:11,dec:11};
   const now = new Date();
-  let start = new Date(now.getFullYear(), months[date[2].toLowerCase()], Number(date[1]), Number(date[3]), Number(date[4]));
-  if (start < new Date(now.getTime() - 180*86400000)) start.setFullYear(start.getFullYear()+1);
+  let start = new Date(date.year||now.getFullYear(), months[date[2].toLowerCase()], Number(date[1]), Number(date[3]), Number(date[4]));
+  if(!date.year&&start < new Date(now.getTime() - 180*86400000)) start.setFullYear(start.getFullYear()+1);
+  if(start.getDate()!==Number(date[1])||start.getMonth()!==months[date[2].toLowerCase()])throw new Error('Fecha no válida.');
   if (start <= now || start-now > 168*3600000) throw new Error('El partido debe empezar en los próximos siete días.');
   const eventId = /\/E(\d+)\//.exec(location.hash)?.[1];
   if (!eventId) throw new Error('No se reconoce el identificador del encuentro.');
@@ -22,11 +33,11 @@ function readBet365VisibleMarket() {
   const league=lines[0];
   const dateIndex=lines[1]==='•'?2:1;
   const dateLabel=lines[dateIndex];
-  const date = /^(\d{1,2})\s+(ene|jan|feb|mar|abr|apr|may|jun|jul|ago|aug|sep|oct|nov|dic|dec)\s+(\d{2}):(\d{2})$/i.exec(dateLabel);
+  const date = bet365DateLabel(dateLabel);
   if (!date) throw new Error('Se necesita la fecha de un partido prepartido.');
   const match=lines[dateIndex+1]||'';
-  const teams = /^v$/i.test(lines[dateIndex+2]||'')?
-    [match,lines[dateIndex+3]]:match.split(/\s+v\s+/i);
+  const teams = /^v(?:s\.?)?$/i.test(lines[dateIndex+2]||'')?
+    [match,lines[dateIndex+3]]:match.split(/\s+v(?:s\.?)?\s+/i);
   if (teams.length !== 2) throw new Error('No se reconocen ambos equipos.');
   // Bet365 changes its generated CSS classes. Identify the exact visible title
   // and the smallest enclosing market with the three named selections instead.

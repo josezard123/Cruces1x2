@@ -1,0 +1,14 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+process.env.TZ='Europe/Madrid';
+const ctx={Date,Intl,setInterval(){},chrome:{storage:{local:{get:async()=>({})},onChanged:{addListener(){}}},runtime:{onMessage:{addListener(){}}}}};
+vm.createContext(ctx);vm.runInContext(fs.readFileSync('bet365_reader.js','utf8'),ctx);vm.runInContext(fs.readFileSync('bet365_extension/content.js','utf8'),ctx);
+const target={canonical_home:'roma',canonical_away:'real madrid'};
+for(const text of ['Roma v Real Madrid','Roma VS Real Madrid','Roma\nReal Madrid','Roma\nV\nReal Madrid'])assert(ctx.matchesSearchHeader(text,target,{}));
+assert(ctx.matchesSearchHeader('AS Roma\nReal Madrid',target,{'as roma':'roma'}));
+for(const text of ['Roma U21 v Real Madrid','Roma\nReal Madrid\n2.00','Real Madrid v Roma','Roma v Real Madrid v Liverpool'])assert(!ctx.matchesSearchHeader(text,target,{}));
+assert.equal(ctx.bet365DateLabel('mié. 14 oct 18:45')[1],'14');
+assert.equal(ctx.bet365DateLabel('14 oct 2026 18:45').year,2026);
+const now=new Date('2026-10-13T12:00:00+02:00');
+assert.equal(ctx.bet365DateLabel('Hoy 21:00',now)[1],'13');assert.equal(ctx.bet365DateLabel('Mañana 21:00',now)[1],'14');
+assert.equal(ctx.bet365DateLabel('Hoy 25:00',now),null);assert.equal(ctx.bet365DateLabel('Próximamente',now),null);
+console.log('Bet365: cabeceras exactas con y sin V, VS, fechas con día de semana, hoy/mañana y año; equipos juveniles y fechas ambiguas excluidos.');

@@ -74,7 +74,32 @@ function parseDirectBf(snapshot,competition,settings,now=new Date()){
 }
 function directWinaSnapshot(){return {cards:[...document.querySelectorAll('[data-testid^="match-card-"]')].filter(n=>n.getClientRects().length).map(n=>({id:n.getAttribute('data-testid').replace('match-card-',''),lines:n.innerText.split('\n').map(s=>s.trim()).filter(Boolean),odds:[...n.querySelectorAll('.odd-button-wrapper')].map(b=>({text:b.innerText,price:b.querySelector('.odd-button-value')?.innerText,active:b.getClientRects().length>0&&b.getAttribute('aria-disabled')!=='true'&&!/disabled|suspend/i.test(b.className)}))}))};}
 function directBfSnapshot(){return {market:[...document.querySelectorAll('button')].find(n=>/seleccionar mercado/i.test(n.innerText))?.innerText,rows:[...document.querySelectorAll('a[href*="/e-"]')].filter(n=>n.getClientRects().length).map(n=>({path:n.getAttribute('href'),teams:[...n.querySelectorAll('[data-testid="team-name"]')].map(t=>t.innerText),date:n.querySelector('time')?.getAttribute('datetime'),buttons:[...n.parentElement.querySelectorAll('button')].filter(b=>/^\d+(?:[.,]\d+)?$/.test(b.innerText.trim())).map(b=>({price:b.innerText.trim(),active:b.getClientRects().length>0&&!b.disabled&&b.getAttribute('aria-disabled')!=='true'}))}))};}
-async function directWait(check){for(let i=0;i<60;i++){if(/access denied|acceso denegado|verify you are human|verifica que eres humano/i.test(document.body.innerText))throw Error('La web bloqueó la lectura pública.');const value=check();if(value)return value;await new Promise(r=>setTimeout(r,500));}throw Error('La web no cargó los partidos antes del límite de espera.');}
+async function directWait(check,milliseconds=30000){
+ // Inactive Chrome tabs throttle repeated timers. Observe DOM changes instead.
+ return new Promise((resolve,reject)=>{
+  let observer,timer,finished=false;
+  const finish=(value,error)=>{if(finished)return;finished=true;observer?.disconnect();clearTimeout(timer);error?reject(error):resolve(value);};
+  const inspect=()=>{try{if(/access denied|acceso denegado|verify you are human|verifica que eres humano/i.test(document.body.innerText))throw Error('La web bloqueó la lectura pública.');const value=check();if(value)finish(value);}catch(error){finish(null,error);}};
+  observer=new MutationObserver(inspect);observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,characterData:true});
+  timer=setTimeout(()=>finish(null,Error('La web no cargó los partidos antes del límite de espera.')),milliseconds);inspect();
+ });
+}
+function directScrollHost(anchor){
+ for(let node=anchor?.parentElement;node;node=node.parentElement){
+  if(node.clientHeight>0&&node.scrollHeight>node.clientHeight+2 &&
+    (String(node.className||'').includes('ReactVirtualized__Grid')||/auto|scroll/.test(getComputedStyle(node).overflowY)))return node;
+ }
+ return null;
+}
+function directCardSignature(wina){
+ return [...document.querySelectorAll(wina?'[data-testid^="match-card-"]':'a[href*="/e-"]')].map(n=>wina?n.getAttribute('data-testid'):n.getAttribute('href')).join('|');
+}
+async function directMoveGrid(grid,position,wina){
+ const before=directCardSignature(wina);grid.scrollTop=position;
+ if(!String(grid.className||'').includes('ReactVirtualized'))return;
+ // A virtual list renders the next cards asynchronously. No timer-poll chain.
+ try{await directWait(()=>directCardSignature(wina)!==before,5000);}catch(error){if(/bloqueó/.test(error.message))throw error;}
+}
 async function discoverDirect(settings){
  const wina=location.hostname==='www.winamax.es';
  if(!wina){await directWait(()=>document.querySelector('[role="tablist"]'));const tab=[...document.querySelectorAll('[role="tab"]')].find(n=>n.innerText.trim()==='Competiciones');if(!tab)throw Error('No apareció Competiciones.');tab.click();}
@@ -94,7 +119,7 @@ async function readDirectCompetition(competition,settings){
  const wina=location.hostname==='www.winamax.es';
  if(wina){
   const result=await directWait(()=>[...document.querySelectorAll('.filter-button')].find(n=>n.innerText.trim()==='Resultado'));
-  result.click();await new Promise(r=>setTimeout(r,1000));
+  result.click();
  }
  if(!wina){
   const selector=await directWait(()=>[...document.querySelectorAll('button')].find(n=>/seleccionar mercado/i.test(n.innerText)));
@@ -105,17 +130,21 @@ async function readDirectCompetition(competition,settings){
    const normal=options.find(n=>directClean(n.getAttribute('aria-label')||(n.id?document.querySelector('label[for="'+n.id+'"]')?.innerText:'')||n.parentElement.parentElement?.innerText)==='resultados');
    if(!(enhanced||normal))throw Error('No apareció el mercado de resultado final.');
    (enhanced||normal).click();
-   await new Promise(r=>setTimeout(r,1000));
+   await directWait(()=>['resultado 2 goles de ventaja','resultados'].includes(directClean(directBfSnapshot().market?.split('\n').pop())));
   }
  }
  await directWait(()=>wina?document.querySelector('[data-testid^="match-card-"] .odd-button-value'):document.querySelector('a[href*="/e-"] button')||document.querySelector('[class*="inlineSportsbookMarket"] button'));
  const events=new Map();
+ const anchor=document.querySelector(wina?'[data-testid^="match-card-"]':'a[href*="/e-"]');
+ const grid=directScrollHost(anchor);
+ // Route changes can preserve an old scroll position. Always start at the top
+ // of the list containing match cards, not the first virtual sidebar grid.
+ if(grid&&grid.scrollTop>0)await directMoveGrid(grid,0,wina);
  for(let page=0;page<20;page++){
   const snapshot=wina?directWinaSnapshot():directBfSnapshot();
   for(const event of (wina?parseDirectWina:parseDirectBf)(snapshot,competition,settings))events.set(event.event_id,event);
-  const grid=wina?document.querySelector('.ReactVirtualized__Grid'):null;
-  if(!grid||grid.scrollHeight<=grid.clientHeight||grid.scrollTop+grid.clientHeight>=grid.scrollHeight-2)break;
-  grid.scrollTop+=Math.max(200,grid.clientHeight-100);await new Promise(r=>setTimeout(r,400));
+  if(!grid||!String(grid.className||'').includes('ReactVirtualized')||grid.scrollHeight<=grid.clientHeight||grid.scrollTop+grid.clientHeight>=grid.scrollHeight-2)break;
+  await directMoveGrid(grid,grid.scrollTop+Math.max(200,grid.clientHeight-100),wina);
  }
  return {observed_at:new Date().toISOString(),events:[...events.values()]};
 }

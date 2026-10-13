@@ -6,8 +6,14 @@ from unittest.mock import patch, Mock
 import app
 import installer
 import updater
+from runtime_paths import VERSION
 
 class DistributionTests(unittest.TestCase):
+    def test_club_variants_keep_age_groups_separate(self):
+        for left,right in [('Bodø/Glimt','Bodo/Glimt'),('AS Roma','Roma'),('LASK Linz','LASK')]:
+            self.assertEqual(app.canonical_team(left),app.canonical_team(right))
+        self.assertNotEqual(app.canonical_team('AS Roma U19'),app.canonical_team('Roma'))
+
     def release(self):
         return {'tag_name':'v4.4.0','assets':[{'name':'Cruces-Setup-4.4.0.exe','size':3,
             'browser_download_url':'https://github.com/josezard123/Cruces1x2/releases/download/v4.4.0/Cruces-Setup-4.4.0.exe',
@@ -67,6 +73,6 @@ class DistributionTests(unittest.TestCase):
             response=client.get(page);self.assertEqual(response.status_code,200)
             self.assertIn(b'app-update-check',response.data)
         self.assertEqual(client.get('/static/app_updates.js').status_code,200)
-        self.assertEqual(client.get('/app-version').json['version'],'4.3.0')
+        self.assertEqual(client.get('/app-version').json['version'],VERSION)
 
 if __name__=='__main__':unittest.main()
