@@ -1,0 +1,8 @@
+<!doctype html><html lang="es"><meta charset="utf-8"><title>Importar Bet365 ES</title>
+<style>body{background:#0a1020;color:#f3f6ff;font:16px Segoe UI;margin:40px auto;max-width:850px;padding:20px}a{color:#9bc0ff}textarea{width:100%;height:250px}button{padding:12px;margin-top:12px}</style>
+<h1>Lectura de Bet365 España</h1>
+<p>Esta lectura corresponde al mercado Resultado final del partido abierto. Caduca a los 5 horas y no se actualiza sola. El lector solo lee los equipos, cuotas, fecha y dirección de esta página; no accede a contraseñas, cookies ni apuestas.</p>
+{% if error %}<p>{{error}}</p>{% endif %}
+<form method="post" action="/bet365-import"><label>Lectura pública del partido<textarea id="payload" name="payload" required></textarea></label><button>Importar lectura y recalcular</button></form>
+<p><a href="/">Volver a la aplicación</a></p>
+<script>const data=location.hash.slice(1); if(data){try{document.getElementById('payload').value=decodeURIComponent(data);history.replaceState(null,'',location.pathname)}catch(e){document.getElementById('payload').value='';}}</script></html>

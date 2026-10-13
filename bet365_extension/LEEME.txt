@@ -1,0 +1,15 @@
+LECTOR AUTOMÁTICO BET365 ES, SPORTIUM Y BETFAIR EXCHANGE - CHROME / EDGE, versión 1.9.0
+
+Instalación única: abre chrome://extensions o edge://extensions, activa Modo desarrollador y carga descomprimida esta carpeta. Activa lectura en el icono Cruces.
+Si ya está instalado, pulsa Recargar en su tarjeta y recarga la pestaña de la app.
+Abre http://127.0.0.1:8802 en ese navegador. Chrome o Edge debe permanecer abierto.
+
+Actualizar cuotas obtiene las referencias de Winamax y Betfair y busca las otras casas automáticamente. Los botones Actualizar solo Bet365 y Actualizar solo Sportium utilizan las referencias guardadas de Winamax y consumen 0 peticiones a PulseScore.
+
+Sportium: abre su catálogo público Partidos / 48 Horas, despliega las principales competiciones y selecciones, identifica equipos y fecha y navega directamente a los enlaces encontrados. Comprueba Ganador (1X2) normal en la página del evento. No utiliza el campo Buscar. La cobertura depende del catálogo de 48 horas; partidos ausentes, duplicados o con fecha distinta quedan excluidos.
+Bet365: busca los encuentros y comprueba Resultado final. Cada casa usa una pestaña propia que se cierra al terminar.
+
+Solo envía a la app local equipos, competición, fechas y cuotas públicas. No utiliza API key, cookies, contraseñas ni operaciones de cuenta o apuestas. No resuelve captchas ni vuelve a intentar accesos bloqueados.
+La zona horaria debe ser Europe/Madrid. La app verifica ambos equipos, competición y fecha con tolerancia máxima de 15 minutos. Las cuotas caducan a los 15 minutos. Hay un máximo de diez minutos por casa y el resultado puede ser parcial.
+
+Comprobado: catálogo y acceso directo reales de Sportium, lectura del mercado normal y pruebas locales de navegación, exclusiones y cálculo. La búsqueda completa en la extensión del Chrome/Edge del usuario requiere comprobar el resultado tras recargar esta versión.

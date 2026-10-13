@@ -1,0 +1,4 @@
+Flask>=3.0,<4
+requests>=2.31,<3
+keyring>=25,<26
+playwright>=1.55,<2

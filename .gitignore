@@ -1,0 +1,15 @@
+config.json
+actualizaciones.json
+*.dpapi
+.pulsescore_key*
+quote_cache.json
+exchange_quotes.json
+bet365_web.json
+sportium_web.json
+bet365_scan_result.json
+rate_state.json
+diagnostico/
+COPIAS_SEGURIDAD/
+__pycache__/
+distribucion/
+*.log

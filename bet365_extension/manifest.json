@@ -1,0 +1,74 @@
+{
+  "manifest_version": 3,
+  "name": "Cruces · lector de cuotas ES",
+  "version": "2.0.3",
+  "description": "Lee cuotas públicas de Bet365, Winamax, Betfair Sportsbook, Sportium y Exchange. No realiza apuestas.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:8802/*",
+    "https://www.bet365.es/*",
+    "http://127.0.0.1:8803/*",
+    "https://www.sportium.es/*",
+    "https://www.betfair.es/exchange/plus/*",
+    "https://www.winamax.es/apuestas-deportivas/*",
+    "https://www.betfair.es/apuestas/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.winamax.es/apuestas-deportivas/*",
+        "https://www.betfair.es/apuestas/*"
+      ],
+      "js": [
+        "direct.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.betfair.es/exchange/plus/*"
+      ],
+      "js": [
+        "exchange.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.sportium.es/*"
+      ],
+      "js": [
+        "sportium.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.bet365.es/*"
+      ],
+      "js": [
+        "reader.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "http://127.0.0.1:8802/*",
+        "http://127.0.0.1:8803/*"
+      ],
+      "js": [
+        "local.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  }
+}

@@ -1,0 +1,103 @@
+function readSportiumVisibleMarket() {
+  const main=document.querySelector('main');
+  if(!main)throw new Error('No apareció el evento de Sportium.');
+  const home=main.querySelector('.ta-firstParticipantName')?.innerText.trim();
+  const away=main.querySelector('.ta-secondParticipantName')?.innerText.trim();
+  const league=main.querySelector('.ta-titleText')?.innerText.trim();
+  if(!home||!away||!league)throw new Error('Falta la cabecera de Sportium.');
+  const markets=[...main.querySelectorAll('.ta-AggregatedMarket')].filter(n=>n.getClientRects().length &&
+    n.querySelector('.headerText')?.innerText.trim()==='Ganador (1X2)');
+  if(markets.length!==1)throw new Error('No hay un único Ganador (1X2) normal.');
+  const rows=[...markets[0].querySelectorAll('.ta-SelectionButtonView')].map(n=>{
+    const [name,price]=n.innerText.split('\n').map(s=>s.trim()).filter(Boolean);
+    return {name,price:/^\d+(?:[.,]\d+)?$/.test(price||'')?Number(price.replace(',','.')):NaN,
+      active:n.getClientRects().length>0 && n.getAttribute('aria-disabled')!=='true' && !n.classList.contains('suspended')};
+  });
+  if(rows.length!==3||rows.some(n=>!n.active||!Number.isFinite(n.price)||n.price<=1)||
+    rows[0].name!==home||rows[1].name!=='Empate'||rows[2].name!==away)throw new Error('El 1-X-2 no tiene tres selecciones verificadas.');
+  return {home,away,league,odds:{'1':rows[0].price,'X':rows[1].price,'2':rows[2].price}};
+}
+function sportiumTeam(value,aliases) {
+  const clean=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').trim();
+  let name=clean(value);name=aliases[name]||name;
+  name=name.split(' ').filter(s=>!['fc','cf','afc','sc','ac','club','futbol','football'].includes(s)).join(' ');
+  return clean(aliases[name]||name);
+}
+function sportiumStart(label,now=new Date()) {
+  const match=/^(Hoy|Mañana|\d{1,2}\s+(?:ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic))\s+(\d{1,2}):(\d{2})$/i.exec(label);
+  if(!match||Number(match[2])>23||Number(match[3])>59)throw new Error('No se reconoce la fecha pública de Sportium.');
+  const date=new Date(now.getFullYear(),now.getMonth(),now.getDate(),Number(match[2]),Number(match[3]));
+  if(match[1].toLowerCase()==='mañana')date.setDate(date.getDate()+1);
+  else if(match[1].toLowerCase()!=='hoy'){
+    const [day,month]=match[1].toLowerCase().split(/\s+/);
+    date.setMonth(['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'].indexOf(month),Number(day));
+    if(date<now-180*86400000)date.setFullYear(date.getFullYear()+1);
+  }
+  if(date<=now||date-now>168*3600000)throw new Error('El evento de Sportium no está en la ventana prepartido.');
+  return date.toISOString();
+}
+function sportiumWait(check,milliseconds=20000){
+  return new Promise((resolve,reject)=>{
+    let observer,timer,done=false;
+    const finish=(value,error)=>{if(done)return;done=true;observer?.disconnect();clearTimeout(timer);error?reject(error):resolve(value);};
+    const inspect=()=>{try{const result=check();if(result)finish(result);}catch(error){finish(null,error);}};
+    observer=new MutationObserver(inspect);observer.observe(document.documentElement,{subtree:true,childList:true,characterData:true,attributes:true});
+    timer=setTimeout(()=>finish(null,new Error('Sportium no cargó el elemento esperado.')),milliseconds);inspect();
+  });
+}
+function readSportiumCatalogue() {
+  const events=new Map();
+  for(const row of document.querySelectorAll('.ta-EventListGroup .ta-EventListItem')) {
+    if(!row.getClientRects().length)continue;
+    const link=row.querySelector('a.ta-EventListItemDetails');
+    const href=link?.getAttribute('href')||'';
+    if(!/^\/apuestas\/sports\/soccer\/events\/\d+$/.test(href))continue;
+    const teams=link.innerText.split('\n').map(s=>s.trim()).filter(Boolean);
+    const date=row.innerText.split('\n').map(s=>s.trim()).find(s=>/^(Hoy|Mañana|\d{1,2}\s+(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)),?\s+\d{1,2}:\d{2}$/i.test(s));
+    if(teams.length!==2||!date)continue;
+    events.set(href,{home:teams[0],away:teams[1],dateLabel:date.replace(',',''),source_url:'https://www.sportium.es'+href,event_id:href.split('/').pop()});
+  }
+  return [...events.values()];
+}
+async function sportiumCatalogue(aliases) {
+  try {
+    if(Intl.DateTimeFormat().resolvedOptions().timeZone!=='Europe/Madrid')throw new Error('Usa la zona horaria Europe/Madrid.');
+    if(/access denied|acceso denegado|verify you are human|verifica que eres humano/i.test(document.body.innerText))return {ok:false,blocked:true,reason:'Sportium bloqueó el acceso; lectura detenida.'};
+    await sportiumWait(()=>document.querySelector('.ta-EventListGroups .ta-GroupHeader'));
+    const warnings=[];
+    // Expand competition headers only, never odds or selections. Unrelated leagues stay closed.
+    const supported=/nations league|amistosos selecciones|copa africa|mundial|eurocopa|champions league|europa league|conference league|la liga|segunda divisi[oó]n|premier league|serie a \(italia\)|bundesliga \(alemania\)|ligue 1|primeira liga|eredivisie|copa del rey/i;
+    for(const group of document.querySelectorAll('.ta-EventListGroup')) {
+      const header=group.querySelector('.ta-GroupHeader');
+      if(!header||!supported.test(header.innerText)||group.querySelector('.ta-EventListItem'))continue;
+      header.click();
+      await sportiumWait(()=>group.querySelector('.ta-EventListItem'),8000).catch(()=>warnings.push('No cargaron los partidos de '+header.innerText.trim().slice(0,100)));
+    }
+    const events=readSportiumCatalogue().flatMap(event=>{
+      try{return [{...event,start:sportiumStart(event.dateLabel),canonical_home:sportiumTeam(event.home,aliases),canonical_away:sportiumTeam(event.away,aliases)}];}catch{return [];}
+    });
+    return {ok:true,events,warnings};
+  }catch(error){return {ok:false,reason:error.message};}
+}
+async function sportiumRead(target,aliases){
+  try{
+    if(!target.verifiedStart)throw new Error('Falta la fecha verificada en la búsqueda.');
+    let lastError='No apareció Ganador (1X2).';
+    const result=await sportiumWait(()=>{
+      try{
+        const event=readSportiumVisibleMarket();
+        if(sportiumTeam(event.home,aliases)!==target.canonical_home||sportiumTeam(event.away,aliases)!==target.canonical_away)return null;
+        return event;
+      }catch(error){lastError=error.message;return null;}
+    }).catch(()=>{throw new Error(lastError);});
+    const id=/\/sports\/soccer\/events\/(\d+)$/.exec(location.pathname)?.[1];
+    if(!id||location.hostname!=='www.sportium.es'||(target.expectedEventId&&id!==target.expectedEventId))throw new Error('No se reconoce el evento de fútbol de Sportium.');
+    return {ok:true,payload:{source_url:location.href,observed_at:new Date().toISOString(),events:[{...result,event_id:id,start:target.verifiedStart,market:'FULL_TIME_1X2'}]}};
+  }catch(error){return {ok:false,reason:error.message};}
+}
+chrome.runtime.onMessage.addListener((message,sender,respond)=>{
+  if(message.type==='reader-ping'){respond({ok:true,url:location.href});return false;}
+  if(message.type==='sportium-catalogue'){sportiumCatalogue(message.aliases||{}).then(respond);return true;}
+  if(message.type==='read-target'){sportiumRead(message.target,message.aliases).then(respond);return true;}
+  return false;
+});

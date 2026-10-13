@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="es" data-cruces-installed="{{ 1 if distribution_installed else 0 }}">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cruces 1-X-2 v4.2</title>
+<style>
+:root{color-scheme:dark;--bg:#0a1020;--panel:#131a2c;--muted:#a5b3d5;--text:#f3f6ff;--accent:#6ba6ff;--good:#50d79a;--warn:#ffd166;--bad:#ff7373;--line:#2b3656;--chip:#0e1628}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Segoe UI,Arial,sans-serif}.wrap{max-width:1500px;margin:auto;padding:28px 24px 70px}.hero{display:flex;justify-content:space-between;gap:24px;align-items:flex-end;flex-wrap:wrap}.hero h1{margin:0;font-size:42px}.hero p{max-width:1050px;color:var(--muted);font-size:17px;line-height:1.55}.pill{border:1px solid var(--line);border-radius:999px;padding:9px 13px;color:var(--muted)}
+.panel,.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px;margin-top:18px}.settings{display:grid;grid-template-columns:2fr .75fr .75fr .75fr auto;gap:12px;align-items:end}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}.field input,.field select{width:100%;background:#0d1425;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:12px}.btn{display:inline-block;border:0;border-radius:11px;padding:12px 17px;font-weight:750;cursor:pointer;text-decoration:none}.primary{background:var(--accent);color:#071022}.secondary{background:#1b2640;color:var(--text);border:1px solid var(--line)}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.status{margin-top:14px;color:var(--muted);line-height:1.55}.status.good{color:var(--good)}.status.error{color:var(--bad)}.status.warn{color:var(--warn)}
+.leagues{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}.check{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;padding:7px 10px;background:var(--chip);font-size:13px}.check input{accent-color:var(--accent)}.sourcechips{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.chip{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:6px 9px;color:#c5d4fb;background:#0d1425}
+.summarybar{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.summarychip{background:#0d1425;border:1px solid var(--line);border-radius:10px;padding:8px 10px;color:var(--muted);font-size:13px}.summarychip strong{color:var(--text)}.sourcegrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:12px}.sourcebox{background:#0d1425;border:1px solid var(--line);border-radius:12px;padding:11px 12px}.sourcebox b{display:block;margin-bottom:4px}.sourcebox small{color:var(--muted)}
+.section-title{margin:0 0 7px;font-size:23px}.subtle{color:var(--muted);line-height:1.5}.scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;margin-top:13px}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line)}th{font-size:12px;color:var(--muted)}td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}.odds{font-variant-numeric:tabular-nums;white-space:nowrap}.yes{color:var(--good);font-weight:700}.no{color:var(--bad)}.srcmeta{display:block;font-size:11px;color:var(--muted);margin-top:3px}.open{font-size:11px;color:#9bc0ff;text-decoration:none;margin-left:5px}.open:hover{text-decoration:underline}
+.cardhead{display:flex;justify-content:space-between;gap:15px}.match{font-size:21px;font-weight:800}.meta{color:var(--muted);font-size:13px;margin-top:4px}.loss{font-size:22px;font-weight:850}.good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}.tag{font-size:12px;border:1px solid var(--line);border-radius:8px;padding:4px 7px}.summary{display:flex;gap:18px;flex-wrap:wrap;margin-top:13px;color:var(--muted)}.summary strong{color:var(--text)}details{margin-top:12px;color:var(--muted)}.empty{text-align:center;color:var(--muted);padding:25px}.note{font-size:12px;color:var(--muted)}
+.info{border-left:4px solid var(--accent);padding-left:14px}.warningbox{border-left:4px solid var(--warn);padding-left:14px}.small{font-size:12px;color:var(--muted)}.calculator-fields{display:grid;grid-template-columns:repeat(3,minmax(130px,1fr));gap:12px;margin-top:16px}.calculator-fields input:disabled{opacity:.65}@media(max-width:600px){.calculator-fields{grid-template-columns:1fr}}
+@media(max-width:1000px){.settings{grid-template-columns:1fr 1fr}.api,.save{grid-column:1/-1}.sourcegrid{grid-template-columns:1fr}.hero h1{font-size:34px}}
+</style>
+<style>.settings{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:650px){.settings{grid-template-columns:1fr}}</style>
+</head>
+<body><div class="wrap">
+<nav style="display:flex;gap:12px;margin-bottom:20px" aria-label="Apartados"><a class="btn primary" href="/" aria-current="page">Cruces 1-X-2</a><a class="btn secondary" href="/freebets">Freebets · Exchange</a></nav>
+<div class="hero"><div><h1>Cruces 1-X-2 <span style="font-size:14px;color:#a5b3d5">v4.2</span></h1><p>Compara <strong>Bet365 ES</strong>, <strong>Winamax ES</strong>, <strong>Betfair Sportsbook</strong> y <strong>Sportium ES</strong>. {% if cfg.odds_mode=='browser_direct' %}Las cuatro casas se leen directamente en Chrome o Edge con el lector instalado, sin consumir PulseScore.{% else %}Bet365 y Sportium se buscan automáticamente en Chrome o Edge con el lector instalado; Winamax y Betfair se consultan mediante PulseScore.{% endif %} Encuentra la mejor combinación con tres casas distintas.</p></div><span class="pill">Solo lectura · no realiza apuestas</span></div>
+
+<div class="panel">
+<form id="update-quotes" method="post" action="/update" data-web="0" data-direct="{{1 if cfg.odds_mode=='browser_direct' else 0}}">
+  <input type="hidden" name="settings_version" value="simple">
+  {% if cfg.odds_mode!='browser_direct' %}<details style="margin-bottom:18px" {% if not configured %}open{% endif %}><summary>API de PulseScore · BASIC{% if configured %} · clave guardada{% endif %}</summary>
+  <div class="field" style="margin-top:12px"><label>API key {% if configured %}(déjala vacía para mantenerla){% endif %}</label><input type="password" name="api_key" autocomplete="off" placeholder="Pega aquí tu API key de PulseScore"></div></details>{% endif %}
+  <div class="settings">
+    <div class="field"><label>Apuesta base al 1 (€)</label><input name="base_stake" type="number" min="0.01" step="0.01" value="{{ cfg.base_stake }}"></div>
+    <div class="field"><label>Próximas horas</label><select name="hours">{% for h in [12,24,36,48,72,120,168] %}<option value="{{h}}" {% if cfg.hours==h %}selected{% endif %}>{{h}} h</option>{% endfor %}</select></div>
+    <div class="field"><label>Pérdida máxima (€)</label><input name="max_loss" type="number" min="0" step="0.01" value="{{ cfg.max_loss }}"></div>
+  </div>
+  <div class="leagues">
+    {% for key,label in leagues.items() %}<label class="check"><input type="checkbox" name="leagues" value="{{key}}" {% if key in cfg.selected_leagues %}checked{% endif %}>{{label}}</label>{% endfor %}
+  </div>
+  <div class="actions"><button class="btn primary" type="submit">Actualizar cuotas</button></div>
+</form>
+<p class="subtle">Actualiza todas las casas. Mantén Chrome o Edge abierto · Sportium: próximas 48 h.</p>
+<div id="reader-status" class="subtle" role="status" style="font-size:18px;color:#9cc9ff;white-space:pre-line"></div>
+<progress id="scan-progress" max="100" hidden aria-label="Progreso de la casa actual" style="width:100%;height:18px;margin:12px 0;accent-color:#6ba6ff"></progress>
+<button type="button" class="btn secondary" id="stop-update" hidden>Detener actualización</button>
+<details><summary>Herramientas y ayuda</summary><div class="actions">{% if cfg.odds_mode!='browser_direct' %}<form method="post" action="/check-api"><button class="btn secondary">Comprobar API</button></form>{% endif %}<a class="btn secondary" href="/download-diagnostic">Diagnóstico seguro</a><a class="btn secondary" href="/bet365-extension">Instalar o actualizar lector</a></div></details>
+{% if configured and not coverage and not message and not error %}<p class="subtle">No hay partidos guardados para estos filtros. Pulsa Actualizar cuotas; si no aparecen encuentros, amplía «Próximas horas» o selecciona otras competiciones.</p>{% endif %}
+{% if message %}<div class="status good">{{message}}</div>{% endif %}{% if error %}<div class="status error">{{error}}</div>{% endif %}{% for w in warnings %}<div class="status warn">{{w}}</div>{% endfor %}
+{% if stats %}
+<div class="summarybar"><div class="summarychip">Partidos unidos: <strong>{{stats.groups}}</strong></div><div class="summarychip">Con al menos 3 casas: <strong>{{stats.with_three}}</strong></div><div class="summarychip">Cruces mostrados: <strong>{{stats.crosses}}</strong></div><div class="summarychip">Peticiones: <strong>{{stats.api_calls}}</strong></div></div>
+{% if stats.sources %}<div class="sourcegrid">{% for key,s in stats.sources.items() %}<div class="sourcebox"><b>{{source_defs[key].label}}</b>{% if s.error %}<small style="color:#ff7373">{{s.error}}</small>{% else %}<small>{{s.with_1x2}} eventos 1-X-2 en ventana · {{s.pages or 0}} pág. · {{s.api_calls or 0}} pet. · recibidos {{s.received_at}}{% if s.last_event %} · escaneado hasta {{s.last_event}}{% endif %}</small>{% endif %}</div>{% endfor %}</div>{% endif %}
+{% endif %}
+</div>
+
+<details class="small" style="margin-top:16px"><summary>Sobre las cuotas</summary><p>Lectura directa: 0 peticiones a PulseScore. Betfair prioriza el mercado de 2 goles de ventaja. Las cuotas se conservan 5 horas; comprueba su precio actual en la casa. Si una lectura falla, se conservan los datos anteriores.</p></details>
+
+{% if coverage %}<div class="panel"><h2 class="section-title">Partidos detectados y cobertura</h2><div class="subtle">Aquí puedes comprobar si las casas están viendo el mismo encuentro y exactamente qué 1-X-2 recibe la app.</div><div class="scroll"><table><thead><tr><th>Partido</th><th>Competición</th><th>Hora</th><th>Bet365</th><th>Winamax ES</th><th>Betfair Sportsbook</th><th>Sportium ES</th></tr></thead><tbody>
+{% for c in coverage %}<tr><td><strong>{{c.home}} — {{c.away}}</strong>{% if c.time_warning %}<span class="srcmeta warn">{{c.time_warning}}</span>{% endif %}</td><td>{{c.league_label}}<span class="srcmeta">{{c.league}}</span></td><td>{{c.start_time}}</td>{% for source in ['bet365','winamax_es','betfair_sb','sportium'] %}{% set b=c.books[source] %}<td>{% if b.has_quote %}{% if b.available %}<span class="yes">✓</span>{% else %}<span class="warn">caducada</span>{% endif %} <span class="odds">{{'%.2f'|format(b.odds['1'])}} / {{'%.2f'|format(b.odds['X'])}} / {{'%.2f'|format(b.odds['2'])}}</span>{% if b.url %}<a class="open" href="{{b.url}}" target="_blank" rel="noopener">↗ abrir</a>{% endif %}<span class="srcmeta">{{b.origin}}</span><span class="srcmeta">hora de esta casa: {{b.source_start}}</span><span class="srcmeta">Lectura: {{b.received_label}}</span>{% if b.updated %}<span class="srcmeta">dato: {{b.updated}}</span>{% endif %}{% if b.reason %}<span class="srcmeta warn">{{b.reason}}</span>{% endif %}{% else %}<span class="no">{% if source=='bet365' and cfg.bet365_mode=='web' %}sin lectura web vigente{% else %}sin 1X2 / no unido{% endif %}</span>{% if source=='bet365' and cfg.bet365_mode in ['auto','browser_auto'] %}<form method="post" action="/refresh-bet365"><input type="hidden" name="home" value="{{c.home}}"><input type="hidden" name="away" value="{{c.away}}"><button class="btn secondary">Buscar este partido</button></form>{% elif source=='bet365' and cfg.bet365_mode=='web' %}<br><a class="open" href="/bet365-extension">Activar lector</a>{% endif %}{% endif %}</td>{% endfor %}</tr>{% endfor %}
+</tbody></table></div></div>{% endif %}
+
+{% if rows %}<div class="panel"><h2 class="section-title">Mejores cruces</h2><div class="subtle">Ordenados por el mejor peor resultado. La apuesta al 1 queda fija y X/2 se optimizan a céntimos entre las asignaciones de tres casas distintas. Si las cuotas son desfavorables, minimizar la pérdida puede dar coberturas pequeñas y retornos desiguales.</div></div>
+{% for r in rows %}{% set b=r.best %}<div class="card"><div class="cardhead"><div><div class="match">{{r.home}} — {{r.away}}</div><div class="meta">{{r.league_label}} · {{r.start_time}}</div></div><div class="loss {% if b.worst_profit>=0 %}good{% elif b.loss<=0.50 %}good{% elif b.loss<=1.50 %}warn{% else %}bad{% endif %}">{% if b.worst_profit>=0 %}+{{'%.2f'|format(b.worst_profit)}} €{% else %}−{{'%.2f'|format(b.loss)}} €{% endif %}</div></div>
+<table><thead><tr><th>Signo</th><th>Casa</th><th class="num">Cuota</th><th class="num">Apostar</th><th class="num">Cobro</th></tr></thead><tbody>
+<tr><td><span class="tag">1</span></td><td>{{b.book1}}{% if b.url1 %} <a class="open" href="{{b.url1}}" target="_blank">↗</a>{% endif %}</td><td class="num">{{'%.2f'|format(b.q1)}}</td><td class="num"><strong>{{'%.2f'|format(b.stake1)}} €</strong></td><td class="num">{{'%.2f'|format(b.return1)}} €</td></tr>
+<tr><td><span class="tag">X</span></td><td>{{b.bookX}}{% if b.urlX %} <a class="open" href="{{b.urlX}}" target="_blank">↗</a>{% endif %}</td><td class="num">{{'%.2f'|format(b.qX)}}</td><td class="num"><strong>{{'%.2f'|format(b.stakeX)}} €</strong></td><td class="num">{{'%.2f'|format(b.returnX)}} €</td></tr>
+<tr><td><span class="tag">2</span></td><td>{{b.book2}}{% if b.url2 %} <a class="open" href="{{b.url2}}" target="_blank">↗</a>{% endif %}</td><td class="num">{{'%.2f'|format(b.q2)}}</td><td class="num"><strong>{{'%.2f'|format(b.stake2)}} €</strong></td><td class="num">{{'%.2f'|format(b.return2)}} €</td></tr></tbody></table>
+<div class="summary"><span>Total: <strong>{{'%.2f'|format(b.total)}} €</strong></span><span>Retorno mínimo: <strong>{{'%.2f'|format(b.min_return)}} €</strong></span><span>Peor caso: <strong>{{'%+.2f'|format(b.worst_profit)}} €</strong></span></div>
+<button type="button" class="btn secondary use-calculator" data-q1="{{b.q1}}" data-qx="{{b.qX}}" data-q2="{{b.q2}}" data-stake="{{b.stake1}}" data-match="{{r.home}} — {{r.away}}" style="margin-top:12px">Llevar a la calculadora</button>
+{% if r.alternatives|length>1 %}<details><summary>Ver otras asignaciones de casas</summary><table><thead><tr><th>1</th><th>X</th><th>2</th><th class="num">Peor caso</th></tr></thead><tbody>{% for a in r.alternatives[1:] %}<tr><td>{{a.book1}} @ {{'%.2f'|format(a.q1)}}</td><td>{{a.bookX}} @ {{'%.2f'|format(a.qX)}}</td><td>{{a.book2}} @ {{'%.2f'|format(a.q2)}}</td><td class="num">{{'%+.2f'|format(a.worst_profit)}} €</td></tr>{% endfor %}</tbody></table></details>{% endif %}</div>{% endfor %}
+{% elif message and coverage %}<div class="panel empty">Hay partidos y cuotas, pero ninguno cumple la pérdida máxima configurada.</div>{% endif %}
+
+
+<section class="panel" id="manual-calculator" aria-labelledby="calculator-title">
+<h2 class="section-title" id="calculator-title">Calculadora manual 1-X-2</h2>
+<p class="subtle">Introduce las cuotas actuales y la apuesta al 1. Calcula automáticamente X y 2 con el mismo criterio de los cruces, o escribe los tres importes para comprobar tu cobertura. Se actualiza al escribir y no consume PulseScore.</p>
+<p id="calculator-match" class="small"></p>
+<div class="calculator-fields">
+<div class="field"><label for="manual-q1">Cuota 1</label><input id="manual-q1" inputmode="decimal" autocomplete="off" placeholder="Ej. 8,50"></div>
+<div class="field"><label for="manual-qX">Cuota X</label><input id="manual-qX" inputmode="decimal" autocomplete="off" placeholder="Ej. 6,25"></div>
+<div class="field"><label for="manual-q2">Cuota 2</label><input id="manual-q2" inputmode="decimal" autocomplete="off" placeholder="Ej. 1,27"></div>
+<div class="field"><label for="manual-stake1">Apuesta al 1 (€)</label><input id="manual-stake1" inputmode="decimal" autocomplete="off" value="{{cfg.base_stake}}"></div>
+<div class="field"><label for="manual-stakeX">Apuesta a X (€)</label><input id="manual-stakeX" inputmode="decimal" autocomplete="off" disabled placeholder="Automática"></div>
+<div class="field"><label for="manual-stake2">Apuesta al 2 (€)</label><input id="manual-stake2" inputmode="decimal" autocomplete="off" disabled placeholder="Automática"></div>
+</div>
+<label class="check" style="margin-top:15px"><input type="checkbox" id="manual-stakes"> Introducir los tres importes manualmente</label>
+<div id="calculator-status" class="status" role="status" aria-live="polite">Completa las tres cuotas para calcular.</div>
+<div id="calculator-results" hidden><div class="scroll"><table><thead><tr><th>Resultado</th><th class="num">Apostar</th><th class="num">Cobro</th><th class="num">Beneficio / pérdida</th></tr></thead><tbody id="calculator-rows"></tbody></table></div><div id="calculator-summary" class="summary"></div></div>
+<p class="note">Los escenarios corresponden al resultado final del partido. No suman posibles pagos anticipados de dos selecciones. Las cuotas manuales no modifican los datos de los partidos.</p>
+<details><summary>Otras casas con pago anticipado de dos goles</summary><p class="subtle"><a class="open" href="https://www.jokerbet.es/apuestas-deportivas/pago-anticipado.html" target="_blank" rel="noopener">JOKERBET · condiciones oficiales</a> y <a class="open" href="https://support.paf.es/hc/es/articles/28185129015452-Pago-anticipado-por-ventaja-de-dos-goles" target="_blank" rel="noopener">Paf · mercado de pago anticipado</a> lo ofrecen en los mercados indicados por cada casa. Puedes comprobar sus cuotas aquí manualmente. Su lectura automática aún no está integrada.</p></details>
+</section>
+</div><script src="/static/scan_progress.js"></script><script>
+{
+let editingSettings=false;
+const updateForm=document.getElementById('update-quotes');
+let updating=false;
+const stopButton=document.getElementById('stop-update');
+let providerPolling=null;
+function watchProviderUpdate(attach=false){
+  stopButton.hidden=false;
+  editingSettings=true;
+  if(providerPolling)clearInterval(providerPolling);
+  const poll=async()=>{
+    try{
+      const progress=await(await fetch('/update-status',{cache:'no-store'})).json();
+      if(progress.running){
+        document.getElementById('reader-status').textContent=progress.cancelled?'Deteniendo… Esperando a que termine la petición enviada.':`${progress.source||'Consultando cuotas'}${progress.page?' · página '+progress.page:''}. No necesitas pulsar de nuevo.`;
+        if(progress.scan?.running)renderScanProgress(progress.scan);
+      }else if(attach){clearInterval(providerPolling);location.href='/update-result';}
+    }catch(_){document.getElementById('reader-status').textContent='No se pudo comprobar el progreso. La consulta puede seguir activa.';}
+  };
+  providerPolling=setInterval(poll,1500);
+  if(attach)poll();
+}
+stopButton.addEventListener('click',async()=>{
+  stopButton.disabled=true;
+  try{
+    const result=await fetch('/stop-update',{method:'POST'});
+    if(!result.ok)throw new Error();
+    document.getElementById('reader-status').textContent='Deteniendo… Se conservarán las últimas cuotas completas.';
+    watchProviderUpdate(true);
+  }catch(_){stopButton.disabled=false;document.getElementById('reader-status').textContent='No se pudo detener. Inténtalo de nuevo.';}
+});
+updateForm.addEventListener('submit',async event=>{
+  if(updateForm.dataset.direct==='1') {
+    // A real navigation reinjects the extension bridge into the new document.
+    if(updating){event.preventDefault();return;}
+    updating=true;
+    updateForm.querySelector('button').disabled=true;
+    document.getElementById('reader-status').textContent='Guardando filtros y preparando lectura directa…';
+    return;
+  }
+  if(updateForm.dataset.web!=='1') {
+    event.preventDefault();
+    if(updating){event.preventDefault();return;}
+    updating=true;editingSettings=true;
+    const button=updateForm.querySelector('button');
+    button.disabled=true;button.textContent='Actualizando…';
+    document.getElementById('reader-status').textContent='Guardando filtros y consultando cuotas. Espera a que termine…';
+    watchProviderUpdate();
+    try{
+      const response=await fetch(updateForm.action,{method:'POST',body:new FormData(updateForm)});
+      if(!response.ok)throw new Error();
+      const html=await response.text();
+      clearInterval(providerPolling);
+      document.open();document.write(html);document.close();
+    }catch(_){
+      clearInterval(providerPolling);updating=false;button.disabled=false;button.textContent='Actualizar cuotas';
+      document.getElementById('reader-status').textContent='Se perdió la conexión. Comprueba el progreso antes de volver a actualizar.';
+      watchProviderUpdate(true);
+    }
+    return;
+  }
+  event.preventDefault();
+  if(updating) return;
+  updating=true; editingSettings=true;
+  const button=updateForm.querySelector('button');
+  button.disabled=true;
+  button.textContent='Leyendo Bet365…';
+  const status=document.getElementById('reader-status');
+  const result=await new Promise(resolve=>{
+    const handler=event=>{clearTimeout(timer);document.removeEventListener('cruces-bet365-refreshed',handler);resolve(event.detail);};
+    const timer=setTimeout(()=>{document.removeEventListener('cruces-bet365-refreshed',handler);resolve(null);},8000);
+    document.addEventListener('cruces-bet365-refreshed',handler);
+    document.dispatchEvent(new CustomEvent('cruces-refresh-bet365'));
+  });
+  status.textContent=result?.ok ? `Bet365: ${result.captured} pestaña(s) leída(s). Actualizando otras casas…` : 'Bet365 no respondió con cuotas nuevas. Instala y activa el lector, abre el partido y usa esta app en el mismo Chrome o Edge.';
+  const notice=document.createElement('input');notice.type='hidden';notice.name='bet365_reader_result';notice.value=result?.ok?'ok':'unavailable';updateForm.appendChild(notice);
+  button.textContent='Actualizando…';
+  updateForm.submit();
+});
+updateForm.addEventListener('input',()=>{editingSettings=true;});
+setInterval(()=>{if(location.pathname==='/'&&!editingSettings&&document.visibilityState==='visible')location.reload();},60000);
+{% if provider_wait %}watchProviderUpdate(true);
+{% elif not automatic_scan %}
+fetch('/update-status',{cache:'no-store'}).then(r=>r.json()).then(p=>{if(p.running)watchProviderUpdate(true);}).catch(()=>{});
+{% endif %}
+{% if automatic_scan %}
+(async()=>{
+  document.getElementById('stop-update').hidden=false;
+  const status=document.getElementById('reader-status');
+  status.textContent='Preparando búsqueda automática de las casas…';
+  editingSettings=true;
+  const ready=await new Promise(resolve=>{
+    if(document.documentElement.dataset.crucesReader==='ready'){resolve(true);return;}
+    const handler=()=>{clearTimeout(timer);document.removeEventListener('cruces-reader-ready',handler);resolve(true);};
+    const timer=setTimeout(()=>{document.removeEventListener('cruces-reader-ready',handler);resolve(false);},8000);
+    document.addEventListener('cruces-reader-ready',handler);
+  });
+    if(!ready){status.textContent='Falta instalar el lector. Instálalo una sola vez y abre esta app en ese mismo Chrome o Edge. No necesitas abrir Bet365.';return;}
+    if(updateForm.dataset.direct==='1' && document.documentElement.dataset.crucesReaderVersion!=='2.0.3'){status.textContent='Recarga la extensión a la versión 2.0.3 y permite Winamax y Betfair Sportsbook. No se ha consumido PulseScore.';return;}
+    if(!['1.8.0','1.9.0','1.9.1','2.0.3'].includes(document.documentElement.dataset.crucesReaderVersion)){status.textContent='Recarga la extensión a la versión 2.0.3 y después recarga esta pestaña. La búsqueda no se ha iniciado.';return;}
+  status.textContent='Leyendo las casas seleccionadas. Espera a que termine…';
+  let waitingForExisting=false;
+  const progressTimer=setInterval(async()=>{
+    try {
+      const progress=await (await fetch('/bet365-scan-status')).json();
+      if(progress.running)renderScanProgress(progress);
+      else if(waitingForExisting && progress.running===false){clearInterval(progressTimer);location.href='/';}
+    } catch(_) {}
+  },2000);
+  const result=await new Promise(resolve=>{
+    const handler=event=>{clearTimeout(timer);document.removeEventListener('cruces-automatic-finished',handler);resolve(event.detail);};
+    const timer=setTimeout(()=>{document.removeEventListener('cruces-automatic-finished',handler);resolve(null);},2430000);
+    document.addEventListener('cruces-automatic-finished',handler);
+    document.dispatchEvent(new CustomEvent('cruces-automatic-bet365',{detail:{{automatic_filter|tojson}}}));
+  });
+  if(result?.reason==='busy'){
+    waitingForExisting=true;
+    status.textContent='Búsqueda en curso. Conectando con su progreso…';
+    return;
+  }
+  clearInterval(progressTimer);
+  if(result?.ok)location.href='/';
+  else status.textContent='El lector no completó la búsqueda. Pulsa Activar lectura en su icono y vuelve a actualizar; revisa el estado de la extensión.';
+})();
+{% endif %}
+}
+</script><script src="/static/manual_calculator.js"></script>{% include 'app_updates.html' %}</body></html>
