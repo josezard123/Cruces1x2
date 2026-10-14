@@ -1,4 +1,4 @@
-LECTOR DE CUOTAS ES - CHROME / EDGE, versión 2.1.0
+LECTOR DE CUOTAS ES - CHROME / EDGE, versión 2.1.1
 
 Lee Bet365, Winamax ES, Betfair Sportsbook, Sportium ES, RETAbet ES y Betfair Exchange sin consumir PulseScore.
 Instalación: abre chrome://extensions o edge://extensions, activa Modo desarrollador y carga descomprimida esta carpeta. Activa lectura en el icono Cruces.

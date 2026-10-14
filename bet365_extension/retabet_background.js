@@ -1,3 +1,31 @@
+async function waitForRetabet(tabId,expectedUrl,milliseconds=30000){
+ const deadline=Date.now()+milliseconds;
+ for(let attempt=0;attempt<60&&Date.now()<deadline;attempt++){
+  try{
+   const ping=await readerTask(tabId,{type:'retabet-ping'},Math.min(5000,Math.max(1,deadline-Date.now())));
+   if(ping?.ok&&ping.ready===true&&ping.url===expectedUrl)return;
+  }catch(_){}
+  await new Promise(resolve=>setTimeout(resolve,500));
+ }
+ throw Error('RETAbet no completó la carga del lector. Comprueba su permiso en la extensión.');
+}
+async function retabetTask(tabId,message,expectedUrl,cancelled,progress){
+ const deadline=Date.now()+90000;
+ for(let attempt=0;attempt<3&&Date.now()<deadline;attempt++){
+  if(await cancelled())return {ok:false,cancelled:true,reason:'Actualización detenida.'};
+  try{
+   // Ping the RETAbet script itself, not only direct.js. A tab may answer the
+   // generic ping while the site is still loading or about to reload.
+   await waitForRetabet(tabId,expectedUrl,Math.min(30000,deadline-Date.now()));
+   const result=await readerTask(tabId,message,Math.min(65000,Math.max(1,deadline-Date.now())));
+   if(result)return result;
+  }catch(error){
+   if(!/message (?:channel|port) closed|receiving end does not exist|could not establish connection|no respondió a tiempo|no completó la carga/i.test(error.message||''))throw error;
+  }
+  if(attempt<2)await progress('Reconectando con RETAbet tras la recarga de su página');
+ }
+ throw Error('RETAbet recargó la página y no se pudo restablecer la lectura. Comprueba el permiso del lector y vuelve a actualizar.');
+}
 async function scanRetabet(origin,continuing){
  const enabled=await chrome.storage.local.get('enabled');if(!enabled.enabled)return {ok:false,captured:0,reason:'disabled'};
  const settings=await(await fetch(origin+'/direct-settings')).json();
@@ -15,8 +43,9 @@ async function scanRetabet(origin,continuing){
   if(!targets.length){failures.push('No hay partidos de referencia de Winamax en el intervalo elegido.');}
   else{
    await progress('Localizando competiciones');
-   tab=await chrome.tabs.create({url:'https://apuestas.retabet.es/deportes/futbol/1',active:false});await waitForReader(tab.id);
-   const discovered=await readerTask(tab.id,{type:'retabet-discover',settings});
+   const firstUrl='https://apuestas.retabet.es/deportes/futbol/1';
+   tab=await chrome.tabs.create({url:firstUrl,active:false});
+   const discovered=await retabetTask(tab.id,{type:'retabet-discover',settings},firstUrl,cancelled,progress);
    if(!discovered?.ok)throw Error(discovered?.reason||'No cargó el catálogo de RETAbet.');
    const competitions=(discovered.competitions||[]).filter(c=>settings.leagues.includes(c.key)&&targets.some(t=>t.league_key===c.key)&&retabetPublicURL(c.url,false)).slice(0,40);
    for(const competition of competitions){
@@ -24,8 +53,8 @@ async function scanRetabet(origin,continuing){
     if(Date.now()-started>600000)throw Error('Tiempo máximo alcanzado; cobertura parcial.');
     await progress('Localizando '+competition.name);
     try{
-     await chrome.tabs.update(tab.id,{url:competition.url});await waitForReader(tab.id,competition.url);
-     const catalogue=await readerTask(tab.id,{type:'retabet-catalogue',competition,settings});
+     await chrome.tabs.update(tab.id,{url:competition.url});
+     const catalogue=await retabetTask(tab.id,{type:'retabet-catalogue',competition,settings},competition.url,cancelled,progress);
      if(catalogue?.blocked)throw Object.assign(Error(catalogue.reason),{blocked:true});
      if(!catalogue?.ok)throw Error(catalogue?.reason||'No cargaron los partidos.');
      for(const event of catalogue.events||[]){if(retabetPublicURL(event.url,true)&&targets.some(t=>matches(event,t)))found.set(event.url,event);}
@@ -39,8 +68,8 @@ async function scanRetabet(origin,continuing){
     if(candidates.length!==1){failures.push(label+': no hay un único partido con equipos, competición y hora coincidentes en RETAbet.');processed++;continue;}
     const target=candidates[0];
     try{
-     await chrome.tabs.update(tab.id,{url:target.url});await waitForReader(tab.id,target.url);
-     const result=await readerTask(tab.id,{type:'retabet-event',target,settings});
+     await chrome.tabs.update(tab.id,{url:target.url});
+     const result=await retabetTask(tab.id,{type:'retabet-event',target,settings},target.url,cancelled,progress);
      if(result?.blocked)throw Object.assign(Error(result.reason),{blocked:true});
      if(!result?.ok)throw Error(result?.reason||'No se pudo leer Ventaja 2 goles.');
      if(await cancelled())break;

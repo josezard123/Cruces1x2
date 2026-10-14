@@ -126,7 +126,7 @@ async function readTarget(target,aliases) {
       try {
         if(!/\/E\d+\//.test(location.hash||''))return null;
         const candidate=readBet365Result();
-        if(normalizeTeam(candidate.events[0].home,aliases)!==target.canonical_home || normalizeTeam(candidate.events[0].away,aliases)!==target.canonical_away) return null;
+        if(normalizeTeam(candidate.events[0].home,aliases)!==target.canonical_home || normalizeTeam(candidate.events[0].away,aliases)!==target.canonical_away){lastError='Los equipos mostrados por Bet365 no coinciden con la referencia.';return null;}
         return candidate;
       } catch(error){lastError=error.message;return null;}
     },30000);

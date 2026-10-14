@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Cruces · lector de cuotas ES",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Lee cuotas públicas de Bet365, Winamax, Betfair Sportsbook, Sportium, RETAbet y Exchange. No realiza apuestas.",
   "permissions": [
     "storage"

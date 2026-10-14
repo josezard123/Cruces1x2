@@ -103,6 +103,7 @@ async function readRetaEvent(target,settings){
 }
 if(typeof chrome!=='undefined')chrome.runtime.onMessage.addListener((message,sender,respond)=>{
  if(location.hostname!=='apuestas.retabet.es')return false;
+ if(message.type==='retabet-ping'){respond({ok:true,url:location.href,ready:document.readyState==='complete'});return false;}
  const handlers={'retabet-discover':()=>discoverReta(message.settings),'retabet-catalogue':()=>readRetaCatalogue(message.competition,message.settings),'retabet-event':()=>readRetaEvent(message.target,message.settings)};
  if(!handlers[message.type])return false;
  handlers[message.type]().then(data=>respond({ok:true,...(message.type==='retabet-discover'?{competitions:data}:message.type==='retabet-catalogue'?{events:data}:{payload:data})})).catch(error=>respond({ok:false,blocked:/bloqueó/.test(error.message),reason:error.message}));return true;

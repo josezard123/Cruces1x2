@@ -1,10 +1,11 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
-let enabled=true,cancelled=false,ambiguous=false,blocked=false;const calls=[];
+let enabled=true,cancelled=false,ambiguous=false,blocked=false,currentUrl;const calls=[];
 const competition={url:'https://apuestas.retabet.es/deportes/futbol/europa/champions-league/10',name:'Champions League',country:'Europa',key:'ucl'};
 const event={url:'https://apuestas.retabet.es/deportes/futbol/europa/champions-league/roma-real-madrid/38230411',event_id:'38230411',home:'Roma',away:'Real Madrid',start:'2026-10-14T19:00:00Z',competition};
 const target={home:event.home,away:event.away,start:event.start,canonical_home:'roma',canonical_away:'real madrid',league_key:'ucl'};
-const ctx={URL,Date,setTimeout,clearTimeout,setInterval,clearInterval,waitForReader:async()=>{},chrome:{storage:{local:{get:async()=>({enabled}),set:async()=>{}}},tabs:{create:async x=>{calls.push(['create',x]);return{id:5};},update:async(id,x)=>calls.push(['update',x]),remove:async id=>calls.push(['remove',id])}},
+const ctx={URL,Date,setTimeout,clearTimeout,setInterval,clearInterval,waitForReader:async()=>{},chrome:{storage:{local:{get:async()=>({enabled}),set:async()=>{}}},tabs:{create:async x=>{currentUrl=x.url;calls.push(['create',x]);return{id:5};},update:async(id,x)=>{currentUrl=x.url;calls.push(['update',x]);},remove:async id=>calls.push(['remove',id])}},
  readerTask:async(id,m)=>{
+  if(m.type==='retabet-ping')return{ok:true,url:currentUrl,ready:true};
   calls.push(['read',m.type]);
   if(blocked)return{ok:false,blocked:true,reason:'La web bloqueó la lectura pública.'};
   if(m.type==='retabet-discover')return{ok:true,competitions:[competition,{...competition,url:'https://evil.example/catalog'}]};
