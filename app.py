@@ -240,6 +240,8 @@ class SourceQuote:
     direct_url: str = ""
     received_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     origin: str = "PulseScore"
+    normal_odds: dict[str, float] | None = None
+    enhanced_odds: dict[str, float] | None = None
 
 
 @dataclass
@@ -315,11 +317,11 @@ def read_config() -> dict[str, Any]:
         "hours": 72,
         "max_loss": 5.0,
         "selected_leagues": DEFAULT_LEAGUES,
-        "max_source_age_minutes": 300,
+        "max_source_age_minutes": 60,
         "api_plan": "BASIC",
         "max_pages": 40,
-        "bet365_mode": "browser_auto" if PACKAGED else "pulsescore",
-        "odds_mode": "browser_direct" if PACKAGED else "pulsescore",
+        "bet365_mode": "browser_auto",
+        "odds_mode": "browser_direct",
     }
     if CONFIG_PATH.exists():
         try:
@@ -330,6 +332,8 @@ def read_config() -> dict[str, Any]:
             pass
     selected = [x for x in cfg.get("selected_leagues", []) if x in LEAGUES]
     cfg["selected_leagues"] = selected or DEFAULT_LEAGUES
+    # Apply the current policy even to installations with the former 5-hour setting.
+    cfg["max_source_age_minutes"] = 60
     return cfg
 
 
@@ -650,7 +654,8 @@ def read_browser_web(source: str, hours: int) -> tuple[list[SourceQuote], dict[s
                 raise ValueError("Incomplete result market")
             quote = SourceQuote(source, label, str(event.get("event_id") or "web"), event["home"], event["away"],
                                 event.get("league", ""), event.get("country", ""), start, odds,
-                                updated=event_capture.isoformat(), direct_url=event.get("source_url",url), received_at=event_capture, origin=f"Web {label} · lectura visible")
+                                updated=event_capture.isoformat(), direct_url=event.get("source_url",url), received_at=event_capture, origin=f"Web {label} · lectura visible",
+                                enhanced_odds=validated_optional_prices(event.get('enhanced_odds')) if source=='bet365' else None)
             if quote_in_window(quote, hours):
                 quotes.append(quote)
         return quotes, {"raw_events":len(payload.get("events", [])), "with_1x2":len(quotes), "without_1x2":0,
@@ -1078,24 +1083,77 @@ def calculate_manual():
     except ValueError as error: return {'ok':False,'error':str(error)},400
 
 
+def validated_optional_prices(value) -> dict[str, float] | None:
+    if not isinstance(value, dict):
+        return None
+    try:
+        if any(isinstance(value.get(sign), bool) for sign in ('1','X','2')):
+            return None
+        prices = {sign:float(value[sign]) for sign in ('1','X','2')}
+        return prices if all(math.isfinite(v) and 1<v<=1000 for v in prices.values()) else None
+    except (ValueError, TypeError, KeyError):
+        return None
+
+
+def bet365_enhanced_prices(q: SourceQuote) -> dict[str, float] | None:
+    if q.source!='bet365' or not quote_is_fresh(q):
+        return None
+    if q.enhanced_odds is not None:
+        return validated_optional_prices(q.enhanced_odds)
+    # Old caches did not retain this field. Recover only the same observation,
+    # never attach a newer/older market to a different normal-odds capture.
+    try:
+        data=json.loads(BET365_BROWSER_PATH.read_text(encoding='utf-8'))
+        matches=[]
+        for event in data.get('events',[]):
+            stamp=parse_dt(event.get('observed_at',data.get('observed_at')))
+            if (str(event.get('event_id'))==q.event_id and event.get('market')=='FULL_TIME_1X2'
+                and canonical_team(event.get('home'))==canonical_team(q.home)
+                and canonical_team(event.get('away'))==canonical_team(q.away)
+                and parse_dt(event.get('start'))==q.start and stamp
+                and abs((stamp-q.received_at).total_seconds())<=1
+                and validated_optional_prices(event.get('odds'))==q.odds):
+                matches.append(event)
+        return validated_optional_prices(matches[0].get('enhanced_odds')) if len(matches)==1 else None
+    except (OSError, ValueError, TypeError, KeyError, AttributeError):
+        return None
+
+
+def cross_prices(q: SourceQuote) -> tuple[dict[str, float], dict[str, str]]:
+    prices=dict(q.odds)
+    labels={sign:'' for sign in ('1','X','2')}
+    if q.source=='retabet':
+        labels={sign:'Ventaja 2 goles' for sign in labels}
+        normal=validated_optional_prices(q.normal_odds)
+        if normal and normal['X']>=prices['X']:
+            prices['X'],labels['X']=normal['X'],'Cuota normal'
+    elif q.source=='bet365':
+        improved=bet365_enhanced_prices(q)
+        if improved and improved['X']>prices['X']:
+            prices['X'],labels['X']=improved['X'],'Cuota mejorada'
+    return prices,labels
+
+
 def build_crosses(groups: list[MatchGroup], base_stake: float, max_loss: float) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for g in groups:
         if len(g.quotes) < 3 or not quote_in_window(next(iter(g.quotes.values())), 168):
             continue
         sources = [source for source,q in g.quotes.items() if quote_is_fresh(q)]
+        selections = {source:cross_prices(g.quotes[source]) for source in sources}
         alternatives: list[dict[str, Any]] = []
         for b1, bx, b2 in itertools.permutations(sources, 3):
             starts=[g.quotes[source].start for source in (b1,bx,b2)]
             if (max(starts)-min(starts)).total_seconds()>900: continue
-            q1 = g.quotes[b1].odds["1"]
-            qx = g.quotes[bx].odds["X"]
-            q2 = g.quotes[b2].odds["2"]
+            q1 = selections[b1][0]["1"]
+            qx = selections[bx][0]["X"]
+            q2 = selections[b2][0]["2"]
             calc = optimized_stakes(base_stake, q1, qx, q2)
             calc.update({
                 "source1": b1, "sourceX": bx, "source2": b2,
                 "book1": SOURCE_DEFS[b1]["label"], "bookX": SOURCE_DEFS[bx]["label"], "book2": SOURCE_DEFS[b2]["label"],
                 "q1": q1, "qX": qx, "q2": q2,
+                "market1": selections[b1][1]['1'], "marketX": selections[bx][1]['X'], "market2": selections[b2][1]['2'],
                 "url1": g.quotes[b1].direct_url, "urlX": g.quotes[bx].direct_url, "url2": g.quotes[b2].direct_url,
             })
             alternatives.append(calc)
@@ -1118,6 +1176,7 @@ def coverage_rows(groups: list[MatchGroup]) -> list[dict[str, Any]]:
         books: dict[str, Any] = {}
         for source in SOURCE_DEFS:
             q = g.quotes.get(source)
+            prices,labels=cross_prices(q) if q else ({},{})
             books[source] = {
                 "available": bool(q) and quote_is_fresh(q),
                 "has_quote": bool(q),
@@ -1126,7 +1185,8 @@ def coverage_rows(groups: list[MatchGroup]) -> list[dict[str, Any]]:
                 "received_at": q.received_at.isoformat() if q else "",
                 "received_label": local_time_label(q.received_at) if q else "",
                 "origin": (q.origin+' · tipo de pago anticipado no verificado' if source=='betfair_sb' and q.origin=='PulseScore' else q.origin) if q else "",
-                "odds": q.odds if q else {},
+                "odds": prices,
+                "market_labels": labels,
                 "updated": q.updated if q else "",
                 "url": q.direct_url if q else "",
             }
@@ -1159,7 +1219,7 @@ def save_quote_cache() -> None:
             data["received_at"] = q.received_at.isoformat()
             quotes.append(data)
     serialized = json.dumps(quotes, ensure_ascii=False)
-    key = get_api_key()
+    key = get_api_key() if read_config().get('odds_mode')!='browser_direct' else None
     QUOTE_CACHE_PATH.write_text(serialized.replace(key, "[REDACTED]") if key else serialized, encoding="utf-8")
 
 
@@ -1222,11 +1282,11 @@ def restore_diagnostic_sample() -> None:
 
 def render_home(**kwargs: Any):
     cfg = read_config()
-    credential = get_api_key()
+    credential = get_api_key() if cfg.get('odds_mode')!='browser_direct' else None
     reader = (RESOURCE_DIR / "bet365_reader.js").read_text(encoding="utf-8")
     bookmarklet = "javascript:" + quote("(()=>{try{" + reader + ";const data=readBet365Result();window.open('http://127.0.0.1:8802/bet365-import#'+encodeURIComponent(JSON.stringify(data)),'_blank')}catch(e){alert(e.message)}})()", safe="")
     html = render_template(
-        "index.html", cfg=cfg, configured=bool(credential), leagues=LEAGUES, source_defs=SOURCE_DEFS,
+        "index.html", cfg=cfg, configured=cfg.get('odds_mode')=='browser_direct' or bool(credential), leagues=LEAGUES, source_defs=SOURCE_DEFS,
         rows=kwargs.get("rows", []), coverage=kwargs.get("coverage", []), stats=kwargs.get("stats", {}),
         error=kwargs.get("error", ""), message=kwargs.get("message", ""), warnings=kwargs.get("warnings", []),
         bet365_bookmarklet=bookmarklet,
@@ -1305,8 +1365,8 @@ def _import_browser(source):
         _last_groups[:] = group_quotes(by_source, set(cfg["selected_leagues"]), cfg["hours"])
         save_quote_cache()
         _last_result.update(coverage=coverage_rows(_last_groups), rows=build_crosses(_last_groups,cfg["base_stake"],cfg["max_loss"]),
-                            message=f"Lectura de {SOURCE_DEFS[source]['label']} importada. No se han realizado peticiones a PulseScore.",
-                            warnings=[f"{SOURCE_DEFS[source]['label']}: lectura web; las cuotas se conservan durante 5 horas."],
+                            message=f"Lectura de {SOURCE_DEFS[source]['label']} importada.",
+                            warnings=[f"{SOURCE_DEFS[source]['label']}: lectura web; las cuotas caducan al cabo de 1 hora."],
                             stats={"groups":len(_last_groups),"with_three":sum(len(g.quotes)>=3 for g in _last_groups),"crosses":len(build_crosses(_last_groups,cfg["base_stake"],cfg["max_loss"])),"api_calls":_last_result.get('stats',{}).get('api_calls',0),"sources":_last_result.get('stats',{}).get('sources',{})})
         if any("(muestra)" in q.origin for g in _last_groups for q in g.quotes.values()):
             _last_result["warnings"].append("Winamax y Betfair: muestra recuperada del diagnóstico reciente; cobertura parcial. No se han repetido peticiones.")
@@ -1445,7 +1505,7 @@ def refresh_bet365_only():
             _last_result.setdefault('stats',{})['api_calls']=0
             return render_home(coverage=coverage_rows(_last_groups),automatic_scan=True,
                                automatic_filter={'home':request.form.get('home',''),'away':request.form.get('away',''),'sources':sources,'missing':request.form.get('missing')=='1'},
-                               message='Buscando automáticamente '+ ' y '.join(SOURCE_DEFS[s]['label'] for s in sources)+' usando las referencias guardadas de Winamax · 0 peticiones a PulseScore.')
+                               message='Buscando automáticamente '+ ' y '.join(SOURCE_DEFS[s]['label'] for s in sources)+' usando las referencias guardadas de Winamax.')
         by_source={source:[] for source in SOURCE_DEFS}
         for group in _last_groups:
             for source,quote_item in group.quotes.items(): by_source[source].append(quote_item)
@@ -1457,7 +1517,7 @@ def refresh_bet365_only():
         by_source['bet365']=[q for q in by_source['bet365'] if (canonical_team(q.home),canonical_team(q.away)) not in keys]+quotes
         _last_groups[:]=group_quotes(by_source,set(cfg['selected_leagues']),cfg['hours'])
         save_quote_cache()
-        _last_result.update(message=f"Bet365: {len(quotes)} partidos leídos automáticamente · 0 peticiones a PulseScore.",warnings=meta.get('failures',[]),stats={'sources':{'bet365':meta},'api_calls':0})
+        _last_result.update(message=f"Bet365: {len(quotes)} partidos leídos automáticamente.",warnings=meta.get('failures',[]),stats={'sources':{'bet365':meta},'api_calls':0})
         return home()
     except PulseScoreError as exc:
         return render_home(error=str(exc),coverage=coverage_rows(_last_groups))
@@ -1473,7 +1533,7 @@ def home():
         groups = [g for g in _last_groups if g.league_key in cfg["selected_leagues"] and quote_in_window(next(iter(g.quotes.values())), cfg["hours"])]
         _last_result["rows"] = build_crosses(groups, cfg["base_stake"], cfg["max_loss"])
         _last_result["coverage"] = coverage_rows(groups)
-        _last_result["stats"].update(groups=len(groups), crosses=len(_last_result["rows"]), with_three=sum(sum(quote_is_fresh(q) for q in g.quotes.values())>=3 for g in groups))
+        _last_result.setdefault("stats",{}).update(groups=len(groups), crosses=len(_last_result["rows"]), with_three=sum(sum(quote_is_fresh(q) for q in g.quotes.values())>=3 for g in groups))
     return render_home(**_last_result)
 
 
@@ -1569,7 +1629,7 @@ def update():
             _last_result.setdefault('stats',{})['api_calls']=0
             return render_home(coverage=coverage_rows(_last_groups),automatic_scan=True,
                                automatic_filter={'sources':['winamax_es','betfair_sb','bet365','sportium','retabet']},
-                               message='Leyendo las casas directamente en el navegador · 0 peticiones a PulseScore.')
+                               message='Leyendo las casas directamente en el navegador.')
         key = get_api_key()
         if not key:
             return render_home(error="Primero guarda tu API key de PulseScore.")

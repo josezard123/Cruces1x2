@@ -6,7 +6,15 @@ function save(){try{sessionStorage.setItem('cruces.freebets',JSON.stringify(Obje
 try{const saved=JSON.parse(sessionStorage.getItem('cruces.freebets')||'null');if(saved)for(const id of fields)if(typeof saved[id]==='string')$(id).value=saved[id];}catch(_){}
 function params(){return new URLSearchParams({source:$('fb-house').value,freebet:$('fb-amount').value,commission:$('fb-commission').value,min_odds:$('fb-min').value,variant:$('fb-variant').value});}
 async function rank(){
- $('fb-variant-field').hidden=$('fb-house').value!=='bet365';
+ const bet=$('fb-house').value==='bet365',reta=$('fb-house').value==='retabet';
+ $('fb-variant-field').hidden=!bet&&!reta;
+ $('fb-variant-label').textContent='Cuotas de '+(reta?'RETAbet':'Bet365');
+ const normal=$('fb-variant').querySelector('[value="normal"]'),enhanced=$('fb-variant').querySelector('[value="enhanced"]'),early=$('fb-variant').querySelector('[value="two_goals"]');
+ enhanced.hidden=enhanced.disabled=reta;early.hidden=early.disabled=!reta;
+ $('fb-variant').querySelector('[value="both"]').textContent=reta?'Comparar normales y Ventaja 2 goles':'Comparar normales y mejoradas';
+ normal.textContent='Solo normales';
+ if((reta&&$('fb-variant').value==='enhanced')||(bet&&$('fb-variant').value==='two_goals')){$('fb-variant').value='both';save();}
+ $('fb-variant-help').textContent=reta?'Compara los dos mercados con su propio rating y cobertura. En Cruces se utiliza la normal para X si tiene mejor precio.':'Abre Bet365 tú e inicia sesión en una ventana normal del mismo navegador para leer sus mejoradas. Si no se pueden leer, solo aparecen las normales.';
  const version=++rankVersion;
  try{
   const response=await fetch('/freebets/opportunities?'+params()),data=await response.json();if(version!==rankVersion)return;
@@ -14,12 +22,12 @@ async function rank(){
   $('fb-rows').replaceChildren();$('fb-table').hidden=!data.rows.length;$('fb-empty').hidden=!!data.rows.length;
   $('fb-count').textContent=data.rows.length+' oportunidades';
   $('fb-empty').textContent=!data.eligible_matches?'No hay cuotas vigentes de esta casa. Actualízalas en la pestaña Cruces y vuelve aquí.':!data.exchange_matches?'Falta una lectura reciente del Exchange. Pulsa «Actualizar Exchange y ordenar».':'No se encontraron coberturas con equipos, hora, cuota mínima y liquidez compatibles.';
-  if(!scan)$('fb-status').textContent=(lastScanMessage?lastScanMessage+' ':'')+`${data.eligible_matches} partidos vigentes de la casa · ${data.exchange_matches} lecturas Exchange vigentes · ${data.insufficient_liquidity} selecciones excluidas por liquidez · 0 peticiones a PulseScore.`;
+  if(!scan)$('fb-status').textContent=(lastScanMessage?lastScanMessage+' ':'')+`${data.eligible_matches} partidos vigentes de la casa · ${data.exchange_matches} lecturas Exchange vigentes · ${data.insufficient_liquidity} selecciones excluidas por liquidez.`;
   for(const row of data.rows){
    const tr=document.createElement('tr');
    const cell=text=>{const td=document.createElement('td');td.textContent=text;tr.append(td);return td;};
    cell(pct(row.rating)).className='rating';const match=cell(`${row.home} — ${row.away}`);const sub=document.createElement('small');sub.textContent=`${row.start} · ${row.sign}: ${row.selection}`;match.append(sub);
-   const back=cell(row.back.toFixed(2));const book=document.createElement('small');book.textContent=row.book+(row.book.startsWith('Bet365')?' · '+row.variant_label:'');back.append(book);
+   const back=cell(row.back.toFixed(2));const book=document.createElement('small');book.textContent=row.book+((row.book.startsWith('Bet365')||row.book==='RETAbet ES')?' · '+row.variant_label:'');back.append(book);
    const lay=cell(row.lay.toFixed(2));const liq=document.createElement('small');liq.textContent='Disponible: '+euro(row.liquidity);lay.append(liq);
    cell(euro(row.lay_stake));cell(euro(row.liability));cell(euro(row.profit));
    const actions=cell('');const button=document.createElement('button');button.className='btn secondary';button.textContent='Calcular';button.addEventListener('click',()=>{$('fb-back').value=row.back;$('fb-lay').value=row.lay;$('fb-selection').textContent=`${row.home} — ${row.away} · ${row.selection} · ${row.variant_label}`;save();calculate();$('fb-calculator').scrollIntoView({behavior:'smooth'});});actions.append(button);
@@ -41,13 +49,13 @@ function finish(detail){
  scan=false;clearInterval(poll);$('fb-refresh').disabled=false;
  const reasons={empty:'No hay cuotas vigentes de esta casa; actualízalas en Cruces.',busy:'El lector está ocupado con otra búsqueda; espera a que termine.',disabled:'Activa la lectura desde el icono de la extensión.',connection:'No se pudo conectar con el lector del Exchange. Recarga la extensión y comprueba su permiso para Betfair.',market:'Exchange no mostró «Cuotas de partido».',layout:'El formato de las cuotas del Exchange no se pudo leer.',loading:'Exchange no cargó su tabla antes del límite de espera.',no_lay:'Exchange mostró partidos, pero no se pudieron leer sus cuotas lay activas.',teams:'Se leyeron cuotas del Exchange, pero sus equipos no coinciden con la casa.',time:'Se encontraron los equipos, pero la fecha u hora del Exchange no coincide con la casa.'};
  Object.assign(reasons,{date_format:'No se pudo interpretar la fecha mostrada por Exchange.',time_window:'Los partidos leídos del Exchange quedan fuera del intervalo prepartido.',lay_buttons:'Exchange no mostró botones lay activos en las filas leídas.',price_format:'No se pudo interpretar el formato de las cuotas o importes lay en euros.'});
- lastScanMessage=detail?.ok&&detail.captured?`Exchange: ${detail.captured} partidos leídos. ${detail.partial?'Cobertura parcial.':''}`:(reasons[detail?.reason]||'No se pudo completar la lectura del Exchange. Recarga el lector 2.1.1 y vuelve a probar.');
+ lastScanMessage=detail?.ok&&detail.captured?`Exchange: ${detail.captured} partidos leídos. ${detail.partial?'Cobertura parcial.':''}`:(reasons[detail?.reason]||'No se pudo completar la lectura del Exchange. Recarga el lector 2.1.2 y vuelve a probar.');
  $('fb-status').textContent=lastScanMessage;rank();
 }
 document.addEventListener('cruces-exchange-finished',event=>finish(event.detail));
 $('fb-refresh').addEventListener('click',()=>{
  if(scan)return;
- if(document.documentElement.dataset.crucesReaderVersion!=='2.1.1'){$('fb-status').textContent='Recarga el lector a versión 2.1.1 en Extensiones y después recarga esta página. La calculadora manual ya funciona.';return;}
+ if(document.documentElement.dataset.crucesReaderVersion!=='2.1.2'){$('fb-status').textContent='Recarga el lector a versión 2.1.2 en Extensiones y después recarga esta página. La calculadora manual ya funciona.';return;}
  scan=true;$('fb-refresh').disabled=true;$('fb-status').textContent='Iniciando lectura automática del Exchange…';
  const started=Date.now();poll=setInterval(async()=>{try{const data=await(await fetch('/freebets/status')).json();if(scan)$('fb-status').textContent=data.message+' '+data.captured+' partidos leídos.';}catch(_){}if(Date.now()-started>600000)finish({ok:false});},2000);
  document.dispatchEvent(new CustomEvent('cruces-read-exchange',{detail:{source:$('fb-house').value}}));

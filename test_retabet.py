@@ -65,4 +65,40 @@ class RetabetTests(unittest.TestCase):
         self.assertEqual(len(ranking['rows']),1)
         self.assertEqual(ranking['rows'][0]['book'],'RETAbet ES')
 
+    def test_normal_draw_cross_and_both_freebet_markets(self):
+        p=self.payload()
+        normal={'1':2.2,'X':3.99,'2':3.5}
+        p['events'][0]['normal_odds']={**normal,'private':'synthetic-ignore'}
+        self.assertEqual(self.client.post('/direct-observation/retabet',json=p).json['captured'],1)
+        group=a._last_groups[0];quote=group.quotes['retabet']
+        self.assertEqual(quote.normal_odds,normal)
+        self.assertNotIn('synthetic-ignore',a.QUOTE_CACHE_PATH.read_text(encoding='utf-8'))
+        group.quotes['sportium']=a.SourceQuote('sportium','Sportium ES','123',quote.home,quote.away,quote.league,quote.country,self.start,{'1':2.1,'X':3.2,'2':3.4})
+        alternatives=a.build_crosses([group],100,1000)[0]['alternatives']
+        for row in alternatives:
+            if row['sourceX']=='retabet':
+                self.assertEqual(row['qX'],3.99);self.assertEqual(row['marketX'],'Cuota normal')
+            if row['source1']=='retabet':self.assertEqual(row['q1'],quote.odds['1'])
+            if row['source2']=='retabet':self.assertEqual(row['q2'],quote.odds['2'])
+        a.save_quote_cache();a._last_groups.clear()
+        with patch.object(a,'restore_quote_cache',self._restore):a.restore_quote_cache()
+        self.assertEqual(a._last_groups[0].quotes['retabet'].normal_odds,normal)
+        exchange={'market':'MATCH_ODDS','currency':'EUR','observed_at':p['observed_at'],'events':[dict(home='Valencia',away='Levante',start=self.start.isoformat(),market_id='1.123456789',url='https://www.betfair.es/exchange/plus/es/fútbol/valencia-levante-apuestas-123456',lays={'X':{'price':4.0,'size':1000}})]}
+        self.client.post('/freebets/exchange-observation',json=exchange)
+        ranking=self.client.get('/freebets/opportunities?source=retabet&freebet=100').json['rows']
+        self.assertEqual(len(ranking),2)
+        self.assertEqual(ranking[0]['variant'],'normal');self.assertEqual(ranking[0]['back'],3.99)
+        self.assertGreater(ranking[0]['rating'],ranking[1]['rating'])
+        self.assertEqual(len(self.client.get('/freebets/opportunities?source=retabet&variant=normal').json['rows']),1)
+        self.assertEqual(self.client.get('/freebets/opportunities?source=retabet&variant=two_goals').json['rows'][0]['variant_label'],'Ventaja 2 goles')
+
+    def test_invalid_optional_normal_market_cannot_replace_verified_quotes(self):
+        self.client.post('/direct-observation/retabet',json=self.payload())
+        original=a._last_groups[0].quotes['retabet'].odds
+        for bad in [{'X':3.99},{'1':True,'X':3.99,'2':3.5},{'1':2.2,'X':float('nan'),'2':3.5}]:
+            p=self.payload();p['events'][0]['normal_odds']=bad
+            self.assertEqual(self.client.post('/direct-observation/retabet',json=p).status_code,400)
+            self.assertEqual(a._last_groups[0].quotes['retabet'].odds,original)
+            self.assertIsNone(a._last_groups[0].quotes['retabet'].normal_odds)
+
 if __name__=='__main__':unittest.main()

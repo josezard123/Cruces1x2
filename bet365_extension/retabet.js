@@ -86,18 +86,24 @@ function parseRetaEvent(snapshot,target,settings,now=new Date()){
  const selections=markets[0].selections;
  if(selections.length!==3||selections.some((s,i)=>s.name!==['1','X','2'][i]))throw Error('No se reconocen los signos 1, X y 2 de RETAbet.');
  const odds=directPrices(selections);if(!odds)throw Error('RETAbet no tiene tres cuotas activas de Ventaja 2 goles.');
- return {event_id:target.event_id,home:snapshot.home,away:snapshot.away,league:competitions[0].name,country:competitions[0].country,start:start.toISOString(),odds,market:'FULL_TIME_1X2',payout:'two_goals',source_url:url};
+ const normalMarkets=snapshot.markets.filter(m=>directClean(m.title)==='1 x 2');
+ let normal_odds;
+ if(normalMarkets.length===1&&normalMarkets[0].selections.length===3&&normalMarkets[0].selections.every((s,i)=>s.name===['1','X','2'][i]))normal_odds=directPrices(normalMarkets[0].selections)||undefined;
+ return {event_id:target.event_id,home:snapshot.home,away:snapshot.away,league:competitions[0].name,country:competitions[0].country,start:start.toISOString(),odds,...(normal_odds?{normal_odds}:{}),market:'FULL_TIME_1X2',payout:'two_goals',source_url:url};
 }
 async function readRetaEvent(target,settings){
  await directWait(()=>{
   const s=retaEventSnapshot();return s.date.length===2&&directTeam(s.home,settings.aliases)===directTeam(target.home,settings.aliases)&&directTeam(s.away,settings.aliases)===directTeam(target.away,settings.aliases)&&s.markets.length;
  });
  let snapshot=retaEventSnapshot();
- const market=snapshot.markets.filter(m=>directClean(m.title)==='1 x 2 ventaja 2 goles');
- if(market.length===1&&!market[0].selections.length){
-  const node=[...document.querySelectorAll('main .detail__bets-wrapper .bets__wrapper')].find(n=>n.getClientRects().length&&directClean(n.querySelector('.bets__tit .mt')?.innerText)==='1 x 2 ventaja 2 goles');
-  node?.querySelector('.bets__tit')?.click();
-  await directWait(()=>retaEventSnapshot().markets.some(m=>directClean(m.title)==='1 x 2 ventaja 2 goles'&&m.selections.length===3));snapshot=retaEventSnapshot();
+ for(const name of ['1 x 2 ventaja 2 goles','1 x 2']){
+  const market=snapshot.markets.filter(m=>directClean(m.title)===name);
+  if(market.length===1&&!market[0].selections.length){
+   const node=[...document.querySelectorAll('main .detail__bets-wrapper .bets__wrapper')].find(n=>n.getClientRects().length&&directClean(n.querySelector('.bets__tit .mt')?.innerText)===name);
+   node?.querySelector('.bets__tit')?.click();
+   try{await directWait(()=>retaEventSnapshot().markets.some(m=>directClean(m.title)===name&&m.selections.length===3),6000);}catch(error){if(name!=='1 x 2')throw error;}
+   snapshot=retaEventSnapshot();
+  }
  }
  return {observed_at:new Date().toISOString(),events:[parseRetaEvent(snapshot,target,settings)]};
 }

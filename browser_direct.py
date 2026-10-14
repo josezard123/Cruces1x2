@@ -51,8 +51,12 @@ def observation(source):
             if event_id in seen:raise ValueError()
             seen.add(event_id)
             origin='Web '+a.SOURCE_DEFS[source]['label']+' · '+('Resultado — 2 goles de ventaja' if event['payout']=='two_goals' else '1X2 normal')
+            normal=None
+            if source=='retabet' and event.get('normal_odds') is not None:
+                normal=a.validated_optional_prices(event['normal_odds'])
+                if normal is None:raise ValueError()
             q=a.SourceQuote(source,a.SOURCE_DEFS[source]['label'],event_id,home,away,event['league'],event['country'],start,odds,
-                            direct_url=event['source_url'],received_at=stamp,updated=stamp.isoformat(),origin=origin)
+                            direct_url=event['source_url'],received_at=stamp,updated=stamp.isoformat(),origin=origin,normal_odds=normal)
             if source=='retabet':
                 a.restore_quote_cache()
                 references=[g.quotes['winamax_es'] for g in a._last_groups if 'winamax_es' in g.quotes]

@@ -197,21 +197,7 @@ def status():
 
 
 def enhanced_prices(q):
-    """Read optional Bet365 prices without altering normal quotes used by Cruces."""
-    a = core()
-    try:
-        data = json.loads(a.BET365_BROWSER_PATH.read_text(encoding='utf-8'))
-        matches = [e for e in data.get('events', [])
-                   if a.canonical_team(e.get('home')) == a.canonical_team(q.home)
-                   and a.canonical_team(e.get('away')) == a.canonical_team(q.away)
-                   and a.parse_dt(e.get('start')) == q.start
-                   and e.get('market') == 'FULL_TIME_1X2'
-                   and fresh(dict(e, observed_at=e.get('observed_at', data.get('observed_at'))))]
-        if len(matches) != 1 or not matches[0].get('enhanced_odds'):
-            return None
-        return {sign:number(matches[0]['enhanced_odds'].get(sign), 1.01, 1000) for sign in ('1','X','2')}
-    except (OSError, ValueError, TypeError, KeyError, AttributeError):
-        return None
+    return core().bet365_enhanced_prices(q)
 
 
 @bp.get('/freebets/opportunities')
@@ -229,7 +215,7 @@ def opportunities():
     except ValueError as exc:
         return {'ok':False, 'error':str(exc)},400
     variant = request.args.get('variant', 'both')
-    if variant not in ('both', 'normal', 'enhanced'):
+    if variant not in ('both', 'normal', 'enhanced', 'two_goals'):
         return {'ok':False, 'error':'Tipo de cuota no reconocido.'},400
     cfg = a.read_config()
     rows = []
@@ -254,6 +240,12 @@ def opportunities():
             if improved:
                 variants.append(('enhanced', improved))
             variants = [(kind, prices) for kind, prices in variants if variant == 'both' or kind == variant]
+        elif source == 'retabet':
+            variants = [('two_goals',q.odds)]
+            normal=a.validated_optional_prices(q.normal_odds)
+            if normal:
+                variants.insert(0,('normal',normal))
+            variants = [(kind, prices) for kind, prices in variants if variant == 'both' or kind == variant]
         for kind, prices in variants:
             for sign, lay in ex['lays'].items():
                 if prices.get(sign,0)<min_odds:
@@ -264,7 +256,7 @@ def opportunities():
                     continue
                 rows.append(dict(calculation, home=q.home,away=q.away,sign=sign,
                                  selection={'1':q.home,'X':'Empate','2':q.away}[sign], start=a.local_time_label(q.start),
-                                 variant=kind, variant_label='Cuota mejorada' if kind=='enhanced' else 'Cuota normal',
+                                 variant=kind, variant_label={'enhanced':'Cuota mejorada','two_goals':'Ventaja 2 goles','normal':'Cuota normal'}[kind],
                                  book=a.SOURCE_DEFS[source]['label'], book_url=q.direct_url or a.make_direct_url(source,q.slug),
                                  exchange_url=ex['url'], liquidity=lay['size'], observed_at=ex['observed_at'],
                                  book_received_at=q.received_at.isoformat()))

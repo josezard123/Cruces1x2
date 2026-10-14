@@ -13,6 +13,7 @@ const snapshot={url,home:'AS Roma',away:'R. Madrid',date:['Hoy','21:00'],competi
 for(const zone of ['UTC','Europe/Madrid','America/New_York']){
  process.env.TZ=zone;const event=ctx.parseRetaEvent(snapshot,target,settings,now);
  assert.equal(event.payout,'two_goals');assert.equal(event.odds['1'],3.49);assert.equal(event.odds.X,3.96);assert.equal(event.odds['2'],1.94);assert.equal(event.start,target.start);
+ assert.equal(event.normal_odds['1'],3.56);assert.equal(event.normal_odds.X,3.99);assert.equal(event.normal_odds['2'],1.96);
  assert.equal(ctx.retaDate('16/10','21:00',now).toISOString(),'2026-10-16T19:00:00.000Z');
  assert.equal(ctx.retaDate('01/01','21:00',new Date('2026-12-31T10:00:00Z')).toISOString(),'2027-01-01T20:00:00.000Z');
 }
@@ -26,5 +27,9 @@ assert.equal(ctx.parseRetaCatalogue([{...rows[0],live:'1'}],competition,settings
 assert.equal(ctx.parseRetaCatalogue([{...rows[0],path:path.replace('champions-league','uefa-youth-league')}],competition,settings,now).length,0);
 assert.equal(ctx.retaCompetition('LaLiga','/deportes/futbol/guatemala/laliga/1'),null);
 assert.equal(ctx.retaCompetition('UEFA Youth League','/deportes/futbol/europa/uefa-youth-league/2617'),null);
+for(const change of [s=>s.markets.splice(0,1),s=>s.markets.push(structuredClone(s.markets[0])),s=>s.markets[0].selections[1].active=false,s=>s.markets[0].selections[1].name='1X']){
+ const copy=structuredClone(snapshot);change(copy);
+ const event=ctx.parseRetaEvent(copy,target,settings,now);assert.equal(event.normal_odds,undefined);assert.equal(event.odds.X,3.96);
+}
 for(const badURL of ['http://apuestas.retabet.es'+path,'https://other.example'+path,'https://user:password@apuestas.retabet.es'+path,url+'#account'])assert.equal(ctx.retaURL(badURL,true),null);
 console.log('RETAbet: mercado de 2 goles separado del normal y de 1 gol, fechas Madrid, signos, equipos, suspensión, duplicados y dominio verificados.');

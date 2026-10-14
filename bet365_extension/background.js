@@ -1,5 +1,16 @@
 let activeScan=null;
 importScripts('recovery_background.js','exchange_background.js','direct_background.js','retabet_background.js');
+async function createBet365Tab(url){
+  // A normal window shares the session opened by the user in this profile.
+  // Never open incognito, handle credentials, or create a betting account.
+  const opened=(await chrome.tabs.query({url:'https://www.bet365.es/*'})).filter(tab=>!tab.incognito);
+  if(!opened.length)throw Error('Abre Bet365 tú en una ventana normal de este mismo Chrome o Edge, inicia sesión y vuelve a actualizar. Se continúa con las otras casas.');
+  const windows=(await chrome.windows.getAll({windowTypes:['normal']})).filter(w=>!w.incognito);
+  const available=windows.filter(w=>opened.some(tab=>tab.windowId===w.id));
+  const window=available.find(w=>w.focused)||available[0];
+  if(!window)throw Error('Abre una ventana normal de Chrome o Edge e inicia sesión tú en Bet365 para leer las cuotas mejoradas.');
+  return chrome.tabs.create({url,active:false,windowId:window.id});
+}
 async function savePublicDiagnostic(origin,result) {
   if(!result?.diagnostic)return;
   try{await fetch(origin+'/reader-diagnostic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(result.diagnostic)});}catch(_){}
@@ -48,7 +59,7 @@ async function scanAutomatically(origin,filter={},source='bet365',continuing=fal
   let captured=0,processed=0;
   const failures=[];
   if(sportium&&data.outside_window)failures.push(`${data.outside_window} partidos fuera del catálogo de 48 horas; no se buscaron en Sportium.`);
-  let tab,catalogue=[];
+  let tab,catalogue=[],enhancedCaptured=0;
   const started=Date.now();
   const progress=async(current='',last_error='')=>{
     await fetch(origin+'/bet365-scan-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source,running:true,total:data.targets.length,processed,captured,current,last_error})});
@@ -57,7 +68,7 @@ async function scanAutomatically(origin,filter={},source='bet365',continuing=fal
   try {
     await progress();
     if(!data.targets.length) {if(!data.outside_window)failures.push('No hay referencias de Winamax para el partido o intervalo elegido.');}
-    else tab=await chrome.tabs.create({url:sportium?'https://www.sportium.es/apuestas/sports/soccer/matches/48h':'https://www.bet365.es/#/AX/',active:false});
+    else tab=sportium?await chrome.tabs.create({url:'https://www.sportium.es/apuestas/sports/soccer/matches/48h',active:false}):await createBet365Tab('https://www.bet365.es/#/AX/');
     if(sportium&&tab){
       await progress('Leyendo el catálogo público de Sportium (48 horas)');
       await waitForReader(tab.id);
@@ -132,7 +143,7 @@ async function scanAutomatically(origin,filter={},source='bet365',continuing=fal
           else {
             if(await cancelled())break;
             const received=await fetch(origin+'/'+source+'-scan-observation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(result.payload)});
-            if(received.ok) captured++;
+            if(received.ok){captured++;if(!sportium&&result.payload.events?.[0]?.enhanced_odds)enhancedCaptured++;}
             else error=(await received.json().catch(()=>null))?.reason||'Fecha, equipos o mercado no verificados por la app.';
           }
         }
@@ -141,8 +152,9 @@ async function scanAutomatically(origin,filter={},source='bet365',continuing=fal
       processed++;
       await progress(match,error);
     }
-  } catch(error){failures.push(sportium?(error.message||'No se pudo leer el catálogo de Sportium.'):'No se pudo completar la búsqueda automática.');}
+  } catch(error){failures.push(error.message||(sportium?'No se pudo leer el catálogo de Sportium.':'No se pudo completar la búsqueda automática.'));}
   finally {if(tab)await chrome.tabs.remove(tab.id).catch(()=>{});}
+  if(!sportium&&captured>0&&enhancedCaptured===0)failures.push('No se han leído cuotas mejoradas. Si Bet365 pide iniciar sesión, hazlo tú en una ventana normal de este mismo navegador y vuelve a actualizar.');
   await fetch(origin+'/bet365-scan-complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source,captured,failures,continuing})});
   await chrome.storage.local.set({status:`${label} terminada: ${captured} con cuotas de ${processed} revisados.${failures.length?' Último error: '+failures[failures.length-1]:''}`});
   return {ok:!(await cancelled()),captured,failures,reason:(await cancelled())?'cancelled':undefined};
@@ -177,6 +189,8 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
     respond({ok:false});return false;
   }
   if (message.type!=='bet365-observation') return false;
+  // Incognito is a separate session and can hide enhanced prices.
+  if(sender.tab?.incognito){respond({ok:false,reason:'incognito'});return false;}
   chrome.storage.local.get('enabled').then(async settings=>{
     if(!settings.enabled){respond({ok:false});return;}
     try{
