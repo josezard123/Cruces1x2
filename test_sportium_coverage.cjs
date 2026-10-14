@@ -1,0 +1,26 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const ctx={Date,Intl,setTimeout,clearTimeout,chrome:{runtime:{onMessage:{addListener(){}}}},MutationObserver:class{observe(){}disconnect(){}},getComputedStyle:()=>({overflowY:'auto'})};
+vm.createContext(ctx);vm.runInContext(fs.readFileSync('bet365_extension/sportium.js','utf8'),ctx);
+assert.equal(ctx.sportiumCompetitionKey('Premier League Keniana (Kenya) 1 X 2 Más de Menos de 1X 12 X2'),null);
+assert.equal(ctx.sportiumCompetitionKey('Premier League\n(Kenya)\n1\nX\n2'),null);
+assert.equal(ctx.sportiumCompetitionKey('Serie A (Brasil)'),null);
+assert.equal(ctx.sportiumCompetitionKey('La Liga (Guatemala)'),null);
+assert.equal(ctx.sportiumCompetitionKey('Premier League (Inglaterra)'),'premier');
+assert.equal(ctx.sportiumCompetitionKey('UEFA Champions League (Fútbol Internacional)'),'ucl');
+assert.equal(ctx.sportiumCompetitionKey('Competiciones UEFA (Clubs) / Champions League'),'ucl');
+assert.equal(ctx.sportiumCompetitionKey('Champions League (Competiciones UEFA (Clubs))'),'ucl');
+assert.equal(ctx.sportiumCompetitionKey('Inglaterra / Premier League'),'premier');
+assert(!ctx.sportiumAllowedGroup('Premier League (Inglaterra)',['ucl']));
+assert(!ctx.sportiumAllowedGroup('Champions League (F)',['ucl']));
+const group={querySelector:()=>({innerText:'UEFA Champions League (Fútbol Internacional)'})};
+const row=(id,home,away)=>({innerText:'Hoy, 21:00\n'+home+'\n'+away,getClientRects:()=>[{}],closest:()=>group,querySelector:()=>({innerText:home+'\n'+away,getAttribute:()=>'/apuestas/sports/soccer/events/'+id})});
+const first=row('1','Feyenoord','Como'),last=row('2','Bodo/Glimt','Borussia Dortmund');let scroll=0;
+const scroller={clientHeight:500,scrollHeight:900,parentElement:null};
+Object.defineProperty(scroller,'scrollTop',{get:()=>scroll,set:value=>{scroll=Math.min(400,Math.max(0,value));}});
+ctx.document={documentElement:{},body:{innerText:'Fútbol'},querySelector:()=>scroller,querySelectorAll:selector=>selector.endsWith('a.ta-EventListItemDetails')?[{getAttribute:()=>scroll===0?'/events/1':'/events/2'}]:[scroll===0?first:last]};
+(async()=>{
+ const events=await ctx.readCompleteSportiumCatalogue(['ucl']);assert.equal(events.length,2);
+ assert.equal(events[0].home,'Feyenoord');assert.equal(events[1].home,'Bodo/Glimt');
+ assert(events.every(e=>/^https:\/\/www\.sportium\.es\/apuestas\/sports\/soccer\/events\/\d+$/.test(e.source_url)));
+ console.log('Sportium: filtro exacto de competición y país; catálogo virtual recorrido completo conservando eventos que desaparecen al desplazarse.');
+})().catch(error=>{console.error(error);process.exitCode=1;});

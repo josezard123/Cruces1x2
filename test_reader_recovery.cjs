@@ -1,0 +1,21 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+let active=90,stopped=false,retries=0;const updates=[];
+const ctx={chrome:{tabs:{query:async()=>[{id:active}],update:async(id,change)=>{assert.deepEqual(Object.keys(change),['active']);active=id;updates.push(id);}}}};
+vm.createContext(ctx);vm.runInContext(fs.readFileSync('bet365_extension/recovery_background.js','utf8'),ctx);
+const tab={id:17,windowId:1},initial={ok:false,diagnostic:{source:'bet365',phase:'event',counts:{market_nodes:0,home_nodes:0,away_nodes:0}}};
+const cancelled=async()=>stopped,progress=async()=>{},retry=async()=>{retries++;return {ok:true,payload:{verified:true}};};
+(async()=>{
+ const result=await ctx.retryEmptyPublicPage(tab,initial,retry,cancelled,progress);
+ assert.equal(result.ok,true);assert.equal(retries,1);assert.deepEqual(updates,[17,90]);assert.equal(active,90);
+ updates.length=0;await ctx.retryEmptyPublicPage(tab,{...initial,blocked:true},retry,cancelled,progress);assert.equal(updates.length,0);
+ await ctx.retryEmptyPublicPage(tab,{ok:false},retry,cancelled,progress);assert.equal(updates.length,0);
+ stopped=true;await ctx.retryEmptyPublicPage(tab,initial,retry,cancelled,progress);assert.equal(updates.length,0);stopped=false;
+ active=17;await ctx.retryEmptyPublicPage(tab,initial,retry,cancelled,progress);assert.equal(updates.length,0);
+ active=90;
+ await ctx.retryEmptyPublicPage(tab,initial,async()=>{active=91;return {ok:true};},cancelled,progress);
+ assert.deepEqual(updates,[17]);assert.equal(active,91);updates.length=0;active=90;
+ const sportium={ok:true,events:[],diagnostic:{source:'sportium',phase:'catalogue',counts:{match_cards:0}}};
+ await ctx.retryEmptyPublicPage(tab,sportium,retry,cancelled,progress);assert.deepEqual(updates,[17,90]);
+ assert(!ctx.emptyPublicPage({...sportium,events:[{id:'1'}]}));
+ console.log('Recuperación: un reintento de la pestaña propia, cancelación, bloqueos respetados y foco devuelto sin interrumpir un cambio de pestaña del usuario.');
+})().catch(error=>{console.error(error);process.exitCode=1;});

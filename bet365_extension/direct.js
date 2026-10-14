@@ -23,6 +23,13 @@ function directCompetition(name,country){
 }
 function directBfCountry(name){const n=directClean(name);if(n==='la liga espanola'||n.startsWith('espana ')||n==='copa del rey')return 'España';if(/inglesa|inglaterra|english/.test(n))return 'Inglaterra';if(/italia/.test(n))return 'Italia';if(/alemania|german/.test(n))return 'Alemania';if(/francia|french/.test(n))return 'Francia';if(/portugal/.test(n))return 'Portugal';if(/holand|paises bajos/.test(n))return 'Países Bajos';return 'Europa';}
 function directBfName(name){const n=directClean(name);if(/premier league|premier inglesa/.test(n))return 'Premier League';if(/serie a.*italia|italia.*serie a/.test(n))return 'Serie A';if(/bundesliga/.test(n))return 'Bundesliga';if(/ligue 1/.test(n))return 'Ligue 1';if(/primeira liga|liga portugal/.test(n))return 'Primeira Liga';if(/eredivisie/.test(n))return 'Eredivisie';return name;}
+function directBfCompetitionURL(path) {
+ try{
+  const url=new URL(path,'https://www.betfair.es/apuestas/');
+  if(url.protocol!=='https:'||url.hostname!=='www.betfair.es'||url.search||url.hash||url.username||url.password||!/^\/apuestas\/fútbol\/[^/]+\/c-\d+$/.test(decodeURIComponent(url.pathname)))return null;
+  return url.href;
+ }catch(_){return null;}
+}
 function directMadridParts(date){return Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Madrid',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(date).map(p=>[p.type,p.value]));}
 function directMadridDate(year,month,day,hour,minute){
  let value=Date.UTC(year,month,day,hour,minute);
@@ -49,7 +56,10 @@ function parseDirectWina(snapshot,competition,settings,now=new Date()){
    const odds=directPrices(card.odds);if(!odds||!/^\d+$/.test(card.id))continue;
    const lines=card.lines,league=lines[0].replace(/J\d+$/,'').trim();
    if(directCompetition(league,competition.country)!==competition.key)continue;
-   const home=lines[1],away=lines[4],start=directWinaDate(lines[2],lines[3],now);
+   // The public coupon omits "Hoy" on today's cards. Tomorrow and later days
+   // have an additional date line; live scores cannot satisfy either layout.
+   const today=/^\d{1,2}:\d{2}$/.test(lines[2]||'');
+   const home=lines[1],away=lines[today?3:4],start=directWinaDate(today?'Hoy':lines[2],lines[today?2:3],now);
    if(!home||!away||start<=now||start-now>settings.hours*3600000)continue;
    // Selection names may have known abbreviations; require canonical team agreement.
    const names=card.odds.map(x=>x.text.split('\n').map(s=>s.trim()).filter(s=>s&&!/^\d/.test(s)&&!s.includes('%')).pop());
@@ -102,15 +112,23 @@ async function directMoveGrid(grid,position,wina){
 }
 async function discoverDirect(settings){
  const wina=location.hostname==='www.winamax.es';
- if(!wina){await directWait(()=>document.querySelector('[role="tablist"]'));const tab=[...document.querySelectorAll('[role="tab"]')].find(n=>n.innerText.trim()==='Competiciones');if(!tab)throw Error('No apareció Competiciones.');tab.click();}
- await directWait(()=>[...document.querySelectorAll('a')].some(n=>wina?/^\/apuestas-deportivas\/sports\/1\/\d+\/\d+$/.test(n.getAttribute('href')||''):/\/c-\d+$/.test(n.getAttribute('href')||'')));
+ const hasCompetition=()=>[...document.querySelectorAll('a')].some(n=>wina?/^\/apuestas-deportivas\/sports\/1\/\d+\/\d+$/.test(n.getAttribute('href')||''):directBfCompetitionURL(n.getAttribute('href')||''));
+ if(!wina){
+  // Some coupons already contain competition links without a tablist.
+  await directWait(()=>hasCompetition()||[...document.querySelectorAll('[role="tab"]')].find(n=>n.innerText.trim()==='Competiciones'));
+  if(!hasCompetition()){
+   const tab=[...document.querySelectorAll('[role="tab"]')].find(n=>n.innerText.trim()==='Competiciones');
+   if(!tab)throw Error('No apareció Competiciones.');tab.click();
+  }
+ }
+ await directWait(hasCompetition);
  const found=new Map();
  for(const link of document.querySelectorAll('a')){
   const path=link.getAttribute('href')||'',name=link.innerText.trim();let country,key,normalized=name;
   if(wina){if(!/^\/apuestas-deportivas\/sports\/1\/\d+\/\d+$/.test(path))continue;country=link.parentElement?.parentElement?.parentElement?.parentElement?.innerText.split('\n')[0];key=directCompetition(name,country);}
-  else{if(!/^(?:\/apuestas\/)?f%C3%BAtbol\/[^/]+\/c-\d+$/i.test(path))continue;country=directBfCountry(name);normalized=directBfName(name);key=directCompetition(normalized,country);}
+  else{if(!directBfCompetitionURL(path))continue;country=directBfCountry(name);normalized=directBfName(name);key=directCompetition(normalized,country);}
   if(!key||!settings.leagues.includes(key))continue;
-  const url=new URL(path,wina?'https://www.winamax.es':'https://www.betfair.es/apuestas/').href;
+  const url=wina?new URL(path,'https://www.winamax.es').href:directBfCompetitionURL(path);
   found.set(url,{url,name:normalized,country,key});
  }
  return [...found.values()].slice(0,40);
@@ -148,9 +166,12 @@ async function readDirectCompetition(competition,settings){
  }
  return {observed_at:new Date().toISOString(),events:[...events.values()]};
 }
+function directDiagnostic(phase) {
+ try{return typeof publicReaderDiagnostic==='function'?publicReaderDiagnostic(location.hostname==='www.winamax.es'?'winamax_es':'betfair_sb',phase):undefined;}catch(_){return undefined;}
+}
 if(typeof chrome!=='undefined')chrome.runtime.onMessage.addListener((message,sender,respond)=>{
  if(message.type==='reader-ping'){respond({ok:true,url:location.href});return false;}
- if(message.type==='direct-discover'){discoverDirect(message.settings).then(competitions=>respond({ok:true,competitions})).catch(error=>respond({ok:false,reason:error.message}));return true;}
- if(message.type==='direct-read'){readDirectCompetition(message.competition,message.settings).then(payload=>respond({ok:true,payload})).catch(error=>respond({ok:false,reason:error.message}));return true;}
+ if(message.type==='direct-discover'){discoverDirect(message.settings).then(competitions=>respond({ok:true,competitions})).catch(error=>respond({ok:false,blocked:/bloqueó/.test(error.message),reason:error.message,diagnostic:directDiagnostic('discover')}));return true;}
+ if(message.type==='direct-read'){readDirectCompetition(message.competition,message.settings).then(payload=>respond({ok:true,payload,diagnostic:directDiagnostic('coupon')})).catch(error=>respond({ok:false,blocked:/bloqueó/.test(error.message),reason:error.message,diagnostic:directDiagnostic('coupon')}));return true;}
  return false;
 });

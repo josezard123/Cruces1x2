@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Cruces · lector de cuotas ES",
-  "version": "2.0.4",
+  "version": "2.0.6",
   "description": "Lee cuotas públicas de Bet365, Winamax, Betfair Sportsbook, Sportium y Exchange. No realiza apuestas.",
   "permissions": [
     "storage"
@@ -22,6 +22,7 @@
         "https://www.betfair.es/apuestas/*"
       ],
       "js": [
+        "diagnostic.js",
         "direct.js"
       ],
       "run_at": "document_idle"
@@ -40,6 +41,7 @@
         "https://www.sportium.es/*"
       ],
       "js": [
+        "diagnostic.js",
         "sportium.js"
       ],
       "run_at": "document_idle"
@@ -49,6 +51,7 @@
         "https://www.bet365.es/*"
       ],
       "js": [
+        "diagnostic.js",
         "reader.js",
         "content.js"
       ],

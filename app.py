@@ -139,6 +139,8 @@ TEAM_ALIASES = {
     "new zealand": "nueva zelanda", "nueva zelanda": "nueva zelanda",
     # Frequent club variants
     "bod glimt": "bodo glimt", "lask linz": "lask", "as roma": "roma",
+    "oporto": "porto", "b munich": "bayern munchen", "leipzig": "rb leipzig",
+    "stuttgart": "vfb stuttgart", "aek": "aek atenas",
     "man utd": "manchester united", "manchester utd": "manchester united",
     "man city": "manchester city", "manchester city fc": "manchester city",
     "psg": "paris saint germain", "paris sg": "paris saint germain",
@@ -1341,7 +1343,7 @@ def bet365_targets():
                 continue
             targets.append({'home':q.home,'away':q.away,'start':q.start.isoformat(),
                             'canonical_home':canonical_team(q.home),'canonical_away':canonical_team(q.away)})
-    return {'targets':targets,'aliases':TEAM_ALIASES,'outside_window':outside_window}
+    return {'targets':targets,'aliases':TEAM_ALIASES,'outside_window':outside_window,'leagues':cfg['selected_leagues']}
 
 
 @app.route('/bet365-scan-status',methods=['GET','POST'])
@@ -1710,6 +1712,8 @@ from freebets import register as register_freebets
 register_freebets(app)
 from distribution import register as register_distribution
 register_distribution(app)
+from reader_diagnostics import bp as reader_diagnostics_bp
+app.register_blueprint(reader_diagnostics_bp)
 
 if __name__ == "__main__":
     threading.Timer(1.1, open_browser).start()

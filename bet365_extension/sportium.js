@@ -40,15 +40,48 @@ function sportiumWait(check,milliseconds=20000){
   return new Promise((resolve,reject)=>{
     let observer,timer,done=false;
     const finish=(value,error)=>{if(done)return;done=true;observer?.disconnect();clearTimeout(timer);error?reject(error):resolve(value);};
-    const inspect=()=>{try{const result=check();if(result)finish(result);}catch(error){finish(null,error);}};
+    const inspect=()=>{try{if(/access denied|acceso denegado|verify you are human|verifica que eres humano/i.test(document.body.innerText))throw new Error('Sportium bloqueó el acceso; lectura detenida.');const result=check();if(result)finish(result);}catch(error){finish(null,error);}};
     observer=new MutationObserver(inspect);observer.observe(document.documentElement,{subtree:true,childList:true,characterData:true,attributes:true});
     timer=setTimeout(()=>finish(null,new Error('Sportium no cargó el elemento esperado.')),milliseconds);inspect();
   });
 }
-function readSportiumCatalogue() {
+function sportiumCompetitionKey(label) {
+  let text=String(label||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').replace(/\s+1\s+x\s+2\b.*$/,'');
+  if(/\(f\)|women|femen|juvenil|\bu[ -]?(17|18|19|20|21|23)\b|virtual|simulated|srl/.test(text))return null;
+  // Category spelling observed in the public Sportium event header.
+  text=text.replace(/^competiciones uefa \(clubs\)\s*\/\s*/,'').replace(/\(competiciones uefa \(clubs\)\)$/,'(europa)').replace(/^futbol internacional\s*\/\s*/,'');
+  const countries=[...text.matchAll(/\(([^)]+)\)/g)].map(m=>m[1].trim());
+  const countryPrefix=/^(espana|inglaterra|italia|alemania|francia|portugal|paises bajos|holanda)\s*\/\s*/.exec(text);
+  if(countryPrefix){countries.push(countryPrefix[1]);text=text.slice(countryPrefix[0].length);}
+  const name=text.replace(/\([^)]*\)/g,'').trim().replace(/\s+/g,' ');
+  const domestic=[
+   ['laliga',/^(la liga|laliga|la liga espanola)$/,['espana']],
+   ['segunda',/^segunda division$/,['espana']],
+   ['copadelrey',/^copa del rey$/,['espana']],
+   ['premier',/^(premier league|premier league inglesa)$/,['inglaterra']],
+   ['seriea',/^serie a$/,['italia']],
+   ['bundesliga',/^bundesliga$/,['alemania']],
+   ['ligue1',/^ligue 1$/,['francia']],
+   ['primeira',/^(primeira liga|liga portugal|liga portugal betclic)$/,['portugal']],
+   ['eredivisie',/^eredivisie$/,['paises bajos','holanda']]
+  ];
+  for(const [key,pattern,allowed] of domestic)if(pattern.test(name)&&countries.every(c=>allowed.includes(c)))return key;
+  if(countries.some(c=>!['europa','futbol internacional','internacional'].includes(c)))return null;
+  if(/^(uefa )?(champions league|liga de campeones)$/.test(name))return 'ucl';
+  if(/^(uefa )?europa league$/.test(name))return 'uel';
+  if(/^(uefa )?conference league$/.test(name))return 'uecl';
+  if(/^(?:(uefa|concacaf|afc|caf|conmebol|ofc) )?(nations league|liga de naciones)$/.test(name)||/^(amistosos selecciones|amistosos internacionales|copa africa|mundial|eurocopa|copa america|copa del golfo)$/.test(name))return 'internationals';
+  return null;
+}
+function sportiumAllowedGroup(label,leagues=[]) {
+  const key=sportiumCompetitionKey(label);return key!==null&&(!leagues.length||leagues.includes(key));
+}
+function readSportiumCatalogue(leagues=[]) {
   const events=new Map();
   for(const row of document.querySelectorAll('.ta-EventListGroup .ta-EventListItem')) {
     if(!row.getClientRects().length)continue;
+    const group=row.closest?.('.ta-EventListGroup'),header=group?.querySelector('.ta-GroupHeader');
+    if(header&&!sportiumAllowedGroup(header.innerText,leagues))continue;
     const link=row.querySelector('a.ta-EventListItemDetails');
     const href=link?.getAttribute('href')||'';
     if(!/^\/apuestas\/sports\/soccer\/events\/\d+$/.test(href))continue;
@@ -59,25 +92,50 @@ function readSportiumCatalogue() {
   }
   return [...events.values()];
 }
-async function sportiumCatalogue(aliases) {
+function sportiumListSignature() {
+  return [...document.querySelectorAll('.ta-EventListGroup .ta-EventListItem a.ta-EventListItemDetails')].map(n=>n.getAttribute('href')).join('|');
+}
+async function readCompleteSportiumCatalogue(leagues=[]) {
+  const collected=new Map(),collect=()=>{for(const event of readSportiumCatalogue(leagues))collected.set(event.source_url,event);};
+  collect();
+  const anchor=document.querySelector('.ta-EventListGroups');let scroller=null;
+  for(let node=anchor;node;node=node.parentElement){
+    if(node.clientHeight>0&&node.scrollHeight>node.clientHeight+2&&/auto|scroll/.test(getComputedStyle(node).overflowY)){scroller=node;break;}
+  }
+  if(!scroller)return [...collected.values()];
+  const move=async position=>{
+    const before=sportiumListSignature();scroller.scrollTop=position;
+    try{await sportiumWait(()=>sportiumListSignature()!==before,1000);}catch(_){}
+    collect();
+  };
+  if(scroller.scrollTop>0)await move(0);
+  for(let page=0;page<20&&scroller.scrollTop+scroller.clientHeight<scroller.scrollHeight-2;page++){
+    const before=scroller.scrollTop;await move(before+Math.max(200,scroller.clientHeight-100));
+    if(scroller.scrollTop===before)break;
+  }
+  return [...collected.values()];
+}
+function sportiumDiagnostic(phase) {
+  try{return typeof publicReaderDiagnostic==='function'?publicReaderDiagnostic('sportium',phase):undefined;}catch(_){return undefined;}
+}
+async function sportiumCatalogue(aliases,leagues=[]) {
   try {
     if(Intl.DateTimeFormat().resolvedOptions().timeZone!=='Europe/Madrid')throw new Error('Usa la zona horaria Europe/Madrid.');
     if(/access denied|acceso denegado|verify you are human|verifica que eres humano/i.test(document.body.innerText))return {ok:false,blocked:true,reason:'Sportium bloqueó el acceso; lectura detenida.'};
     await sportiumWait(()=>document.querySelector('.ta-EventListGroups .ta-GroupHeader'));
     const warnings=[];
     // Expand competition headers only, never odds or selections. Unrelated leagues stay closed.
-    const supported=/nations league|amistosos selecciones|copa africa|mundial|eurocopa|champions league|europa league|conference league|la liga|segunda divisi[oó]n|premier league|serie a \(italia\)|bundesliga \(alemania\)|ligue 1|primeira liga|eredivisie|copa del rey/i;
     for(const group of document.querySelectorAll('.ta-EventListGroup')) {
       const header=group.querySelector('.ta-GroupHeader');
-      if(!header||!supported.test(header.innerText)||group.querySelector('.ta-EventListItem'))continue;
+      if(!header||!sportiumAllowedGroup(header.innerText,leagues)||group.querySelector('.ta-EventListItem'))continue;
       header.click();
       await sportiumWait(()=>group.querySelector('.ta-EventListItem'),8000).catch(()=>warnings.push('No cargaron los partidos de '+header.innerText.trim().slice(0,100)));
     }
-    const events=readSportiumCatalogue().flatMap(event=>{
+    const events=(await readCompleteSportiumCatalogue(leagues)).flatMap(event=>{
       try{return [{...event,start:sportiumStart(event.dateLabel),canonical_home:sportiumTeam(event.home,aliases),canonical_away:sportiumTeam(event.away,aliases)}];}catch{return [];}
     });
-    return {ok:true,events,warnings};
-  }catch(error){return {ok:false,reason:error.message};}
+    return {ok:true,events,warnings,diagnostic:sportiumDiagnostic('catalogue')};
+  }catch(error){return {ok:false,blocked:/bloqueó/.test(error.message),reason:error.message,diagnostic:sportiumDiagnostic('catalogue')};}
 }
 async function sportiumRead(target,aliases){
   try{
@@ -97,7 +155,7 @@ async function sportiumRead(target,aliases){
 }
 chrome.runtime.onMessage.addListener((message,sender,respond)=>{
   if(message.type==='reader-ping'){respond({ok:true,url:location.href});return false;}
-  if(message.type==='sportium-catalogue'){sportiumCatalogue(message.aliases||{}).then(respond);return true;}
+  if(message.type==='sportium-catalogue'){sportiumCatalogue(message.aliases||{},Array.isArray(message.leagues)?message.leagues:[]).then(respond);return true;}
   if(message.type==='read-target'){sportiumRead(message.target,message.aliases).then(respond);return true;}
   return false;
 });

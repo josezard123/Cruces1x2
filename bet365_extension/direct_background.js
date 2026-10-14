@@ -30,6 +30,11 @@ async function scanDirectSource(origin,source,continuing){
   if(discover){
    try{await waitForReader(tab.id);result=await readerTask(tab.id,{type:'direct-discover',settings:configuration});}
    catch(error){if(!known.length)throw error;failures.push('Catálogo: '+error.message);}
+   if(typeof savePublicDiagnostic==='function')await savePublicDiagnostic(origin,result);
+   if(!wina&&typeof retryEmptyPublicPage==='function'){
+    result=await retryEmptyPublicPage(tab,result,()=>readerTask(tab.id,{type:'direct-discover',settings:configuration}),cancelled,progress);
+    if(typeof savePublicDiagnostic==='function')await savePublicDiagnostic(origin,result);
+   }
    if(known.length)result={ok:true,competitions:[...new Map([...known,...(result.competitions||[])].map(c=>[c.url,c])).values()]};
   }
   if(!result?.ok)throw Error(result?.reason||'No se pudo leer el catálogo público.');
@@ -44,7 +49,13 @@ async function scanDirectSource(origin,source,continuing){
    await progress('Leyendo '+competition.name);
    try{
     await chrome.tabs.update(tab.id,{url:competition.url});await waitForReader(tab.id,competition.url);
-    const read=await readerTask(tab.id,{type:'direct-read',competition,settings:configuration},120000);
+    const task={type:'direct-read',competition,settings:configuration};
+    let read=await readerTask(tab.id,task,120000);
+    if(typeof savePublicDiagnostic==='function')await savePublicDiagnostic(origin,read);
+    if(!wina&&typeof retryEmptyPublicPage==='function'){
+     read=await retryEmptyPublicPage(tab,read,()=>readerTask(tab.id,task,120000),cancelled,progress);
+     if(typeof savePublicDiagnostic==='function')await savePublicDiagnostic(origin,read);
+    }
     if(!read?.ok)throw Error(read?.reason||'No se pudo leer el resultado final.');
     if(await cancelled())break;
     const response=await fetch(origin+'/direct-observation/'+source,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(read.payload)});

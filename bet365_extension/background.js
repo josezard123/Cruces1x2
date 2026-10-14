@@ -1,5 +1,9 @@
 let activeScan=null;
-importScripts('exchange_background.js','direct_background.js');
+importScripts('recovery_background.js','exchange_background.js','direct_background.js');
+async function savePublicDiagnostic(origin,result) {
+  if(!result?.diagnostic)return;
+  try{await fetch(origin+'/reader-diagnostic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(result.diagnostic)});}catch(_){}
+}
 async function waitForReader(tabId,expectedUrl) {
   for(const deadline=Date.now()+30000;Date.now()<deadline;) {
     try {
@@ -9,6 +13,19 @@ async function waitForReader(tabId,expectedUrl) {
     await new Promise(resolve=>setTimeout(resolve,500));
   }
   throw new Error('No se pudo conectar con el lector tras cargar la página.');
+}
+async function selectBetTarget(tabId,target,aliases) {
+  try{return await readerTask(tabId,{type:'scan-target',target,aliases});}
+  catch(_){
+    // A genuine event navigation can close the response channel. Confirm the
+    // actual public event route instead of treating every timeout as success.
+    try{
+      await waitForReader(tabId);
+      const ping=await readerTask(tabId,{type:'reader-ping'},5000),url=new URL(ping?.url||'');
+      if(ping?.ok&&url.protocol==='https:'&&url.hostname==='www.bet365.es'&&/\/E\d+\//.test(url.hash))return {ok:true,navigated:true};
+    }catch(_){}
+    return {ok:false,reason:'Bet365 no respondió a la búsqueda; no se confirmó la apertura del partido.'};
+  }
 }
 async function scanAutomatically(origin,filter={},source='bet365',continuing=false) {
   const cancelled=async()=> (await(await fetch(origin+'/update-status')).json()).cancelled===true;
@@ -37,7 +54,11 @@ async function scanAutomatically(origin,filter={},source='bet365',continuing=fal
     if(sportium&&tab){
       await progress('Leyendo el catálogo público de Sportium (48 horas)');
       await waitForReader(tab.id);
-      const listed=await readerTask(tab.id,{type:'sportium-catalogue',aliases:data.aliases});
+      const task={type:'sportium-catalogue',aliases:data.aliases,leagues:data.leagues||[]};
+      let listed=await readerTask(tab.id,task);
+      await savePublicDiagnostic(origin,listed);
+      listed=await retryEmptyPublicPage(tab,listed,()=>readerTask(tab.id,task),cancelled,progress);
+      await savePublicDiagnostic(origin,listed);
       if(!listed?.ok)throw new Error(listed?.reason||'No se pudo leer el catálogo público de Sportium.');
       catalogue=listed.events||[];
       failures.push(...(listed.warnings||[]));
@@ -66,13 +87,18 @@ async function scanAutomatically(origin,filter={},source='bet365',continuing=fal
             selected={ok:true,verifiedStart:found[0].start,expectedEventId:found[0].event_id};
           }
         }else {
-          selected=await readerTask(tab.id,{type:'scan-target',target,aliases:data.aliases}).catch(()=>({ok:true,navigated:true}));
+          selected=await selectBetTarget(tab.id,target,data.aliases);
+          await savePublicDiagnostic(origin,selected);
+          selected=await retryEmptyPublicPage(tab,selected,()=>selectBetTarget(tab.id,target,data.aliases),cancelled,progress);
+          await savePublicDiagnostic(origin,selected);
           const original=target.home.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').trim();
           if(!selected?.ok&&!selected?.blocked&&target.canonical_home!==original&&!(await cancelled())){
             // One fallback for known name variants; the teams and date still need verification.
             const alternate='https://www.bet365.es/#/AX/K%5E'+encodeURIComponent(target.canonical_home)+'/';
             await chrome.tabs.update(tab.id,{url:alternate});await waitForReader(tab.id,alternate);
-            selected=await readerTask(tab.id,{type:'scan-target',target,aliases:data.aliases}).catch(()=>({ok:true,navigated:true}));
+            selected=await selectBetTarget(tab.id,target,data.aliases);
+            selected=await retryEmptyPublicPage(tab,selected,()=>selectBetTarget(tab.id,target,data.aliases),cancelled,progress);
+            await savePublicDiagnostic(origin,selected);
           }
         }
         if(!selected?.ok) {
@@ -86,6 +112,11 @@ async function scanAutomatically(origin,filter={},source='bet365',continuing=fal
             // A full document navigation closes the first message channel.
             await waitForReader(tab.id);
             result=await readerTask(tab.id,{type:'read-target',target:readTarget,aliases:data.aliases});
+          }
+          await savePublicDiagnostic(origin,result);
+          if(!sportium){
+            result=await retryEmptyPublicPage(tab,result,()=>readerTask(tab.id,{type:'read-target',target:readTarget,aliases:data.aliases}),cancelled,progress);
+            await savePublicDiagnostic(origin,result);
           }
           if(!result?.ok)error=result?.reason||'No apareció Resultado final.';
           else {

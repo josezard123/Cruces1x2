@@ -10,7 +10,7 @@ from runtime_paths import VERSION
 
 class DistributionTests(unittest.TestCase):
     def test_club_variants_keep_age_groups_separate(self):
-        for left,right in [('Bodø/Glimt','Bodo/Glimt'),('AS Roma','Roma'),('LASK Linz','LASK')]:
+        for left,right in [('Bodø/Glimt','Bodo/Glimt'),('AS Roma','Roma'),('LASK Linz','LASK'),('Oporto','FC Porto'),('Stuttgart','VfB Stuttgart'),('AEK','AEK Atenas')]:
             self.assertEqual(app.canonical_team(left),app.canonical_team(right))
         self.assertNotEqual(app.canonical_team('AS Roma U19'),app.canonical_team('Roma'))
 

@@ -5,6 +5,7 @@ vm.createContext(ctx);vm.runInContext(fs.readFileSync('bet365_reader.js','utf8')
 const target={canonical_home:'roma',canonical_away:'real madrid'};
 for(const text of ['Roma v Real Madrid','Roma VS Real Madrid','Roma\nReal Madrid','Roma\nV\nReal Madrid'])assert(ctx.matchesSearchHeader(text,target,{}));
 assert(ctx.matchesSearchHeader('AS Roma\nReal Madrid',target,{'as roma':'roma'}));
+assert(ctx.matchesSearchHeader('Real Betis v Oporto',{canonical_home:'real betis',canonical_away:'porto'},{oporto:'porto'}));
 for(const text of ['Roma U21 v Real Madrid','Roma\nReal Madrid\n2.00','Real Madrid v Roma','Roma v Real Madrid v Liverpool'])assert(!ctx.matchesSearchHeader(text,target,{}));
 assert.equal(ctx.bet365DateLabel('mié. 14 oct 18:45')[1],'14');
 assert.equal(ctx.bet365DateLabel('14 oct 2026 18:45').year,2026);

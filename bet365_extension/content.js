@@ -1,6 +1,9 @@
 let enabled = false;
 let busy = false;
 let scanning = false;
+function bet365Diagnostic(phase,target,aliases) {
+  try {return typeof publicReaderDiagnostic==='function'?publicReaderDiagnostic('bet365',phase,target,aliases):undefined;}catch(_){return undefined;}
+}
 async function capture() {
   if (!enabled || busy || scanning) return {ok:false};
   busy = true;
@@ -107,10 +110,10 @@ async function scanTarget(target,aliases) {
       return matchesSearchHeader(row.innerText,target,aliases);
     }).filter(row=>![...row.children].some(child=>child.innerText===row.innerText));
     const rows=await waitFor(()=>{const found=find();return found.length?found:null;},30000);
-    if(rows.length!==1)return {ok:false,reason:'La búsqueda no identifica un único partido.'};
+    if(rows.length!==1)return {ok:false,reason:'La búsqueda no identifica un único partido.',diagnostic:bet365Diagnostic('search',target,aliases)};
     rows[0].click();
     return {ok:true,navigated:true};
-  } catch(error) {return {ok:false,reason:error.message==='La web no cargó el elemento esperado.'?
+  } catch(error) {return {ok:false,diagnostic:bet365Diagnostic('search',target,aliases),reason:error.message==='La web no cargó el elemento esperado.'?
     'La búsqueda no mostró este encuentro antes del límite de espera.':error.message};}
   finally {scanning=false;}
 }
@@ -129,6 +132,12 @@ async function readTarget(target,aliases) {
     },30000);
     if(Math.abs(new Date(payload.events[0].start)-new Date(target.start))>900000)return {ok:false,reason:'Hora distinta; partido excluido.'};
     return {ok:true,payload:await readWithEnhanced(payload)};
-  } catch(_){return {ok:false,reason:lastError};}
+  } catch(_){
+    const blocked=/access denied|acceso denegado|verify you are human|verifica que eres humano/i.test(document.body.innerText);
+    const diagnostic=bet365Diagnostic('event',target,aliases);
+    if(blocked)return {ok:false,blocked:true,reason:'Bet365 bloqueó el acceso; lectura detenida.'};
+    if(diagnostic?.counts.market_nodes===0&&diagnostic?.counts.home_nodes===0&&diagnostic?.counts.away_nodes===0)lastError='Bet365 no cargó la cabecera ni Resultado final del partido.';
+    return {ok:false,reason:lastError,diagnostic};
+  }
   finally{scanning=false;}
 }

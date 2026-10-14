@@ -183,8 +183,8 @@ fetch('/update-status',{cache:'no-store'}).then(r=>r.json()).then(p=>{if(p.runni
     document.addEventListener('cruces-reader-ready',handler);
   });
     if(!ready){status.textContent='Falta instalar el lector. Instálalo una sola vez y abre esta app en ese mismo Chrome o Edge. No necesitas abrir Bet365.';return;}
-    if(updateForm.dataset.direct==='1' && document.documentElement.dataset.crucesReaderVersion!=='2.0.4'){status.textContent='Recarga la extensión a la versión 2.0.4 y permite Winamax y Betfair Sportsbook. No se ha consumido PulseScore.';return;}
-    if(!['1.8.0','1.9.0','1.9.1','2.0.4'].includes(document.documentElement.dataset.crucesReaderVersion)){status.textContent='Recarga la extensión a la versión 2.0.4 y después recarga esta pestaña. La búsqueda no se ha iniciado.';return;}
+    if(updateForm.dataset.direct==='1' && document.documentElement.dataset.crucesReaderVersion!=='2.0.6'){status.textContent='Recarga la extensión a la versión 2.0.6 y permite Winamax y Betfair Sportsbook. No se ha consumido PulseScore.';return;}
+    if(!['1.8.0','1.9.0','1.9.1','2.0.6'].includes(document.documentElement.dataset.crucesReaderVersion)){status.textContent='Recarga la extensión a la versión 2.0.6 y después recarga esta pestaña. La búsqueda no se ha iniciado.';return;}
   status.textContent='Leyendo las casas seleccionadas. Espera a que termine…';
   let waitingForExisting=false;
   const progressTimer=setInterval(async()=>{
