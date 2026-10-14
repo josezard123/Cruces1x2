@@ -1,6 +1,6 @@
 // Exchange public match tasks only; never read forms or credentials.
 document.documentElement.dataset.crucesReader='ready';
-document.documentElement.dataset.crucesReaderVersion='2.0.7';
+document.documentElement.dataset.crucesReaderVersion='2.0.8';
 document.addEventListener('cruces-read-exchange',async event=>{
   try {
     const result=await chrome.runtime.sendMessage({type:'automatic-exchange-scan',source:String(event.detail?.source||'winamax_es')});

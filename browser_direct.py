@@ -38,6 +38,7 @@ def observation(source):
             if source=='betfair_sb' and not __import__('re').fullmatch(r'/apuestas/fútbol/[^/]+/[^/]+/e-\d+',path):raise ValueError()
             if event.get('market')!='FULL_TIME_1X2' or event.get('payout') not in ('normal','two_goals'):raise ValueError()
             if source=='winamax_es' and event['payout']!='normal':raise ValueError()
+            if source=='betfair_sb' and event['payout']!='two_goals':raise ValueError()
             start=a.parse_dt(event['start'])
             if not start:raise ValueError()
             home,away=event['home'],event['away']

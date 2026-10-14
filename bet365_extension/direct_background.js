@@ -12,9 +12,16 @@ async function scanDirectSource(origin,source,continuing){
  const cancelled=async()=> (await(await fetch(origin+'/update-status')).json()).cancelled===true;
  if(await cancelled())return {ok:false,captured:0,reason:'cancelled'};
  const wina=source==='winamax_es',label=wina?'Winamax ES':'Betfair Sportsbook';
- // Competition URL verified on the public Spanish coupon. Avoid its menu for LaLiga-only scans.
- const known=!wina&&configuration.leagues.includes('laliga')?[{url:'https://www.betfair.es/apuestas/f%C3%BAtbol/la-liga-espa%C3%B1ola/c-117',name:'La Liga Española',country:'España',key:'laliga'}]:[];
- const discover=wina||configuration.leagues.some(key=>key!=='laliga');
+ // These routes were observed in Betfair's public Spanish competition menu.
+ // Directly open selected known coupons; an inactive tab need not load its menu.
+ const publicCoupons=[
+  {url:'https://www.betfair.es/apuestas/f%C3%BAtbol/la-liga-espa%C3%B1ola/c-117',name:'La Liga Española',country:'España',key:'laliga'},
+  {url:'https://www.betfair.es/apuestas/f%C3%BAtbol/uefa-champions-league/c-228',name:'UEFA Champions League',country:'Europa',key:'ucl'},
+  {url:'https://www.betfair.es/apuestas/f%C3%BAtbol/uefa-europa-league/c-2005',name:'UEFA Europa League',country:'Europa',key:'uel'},
+  {url:'https://www.betfair.es/apuestas/f%C3%BAtbol/uefa-conference-league/c-12375833',name:'UEFA Conference League',country:'Europa',key:'uecl'}
+ ];
+ const known=wina?[]:publicCoupons.filter(c=>configuration.leagues.includes(c.key));
+ const discover=wina||configuration.leagues.some(key=>!known.some(c=>c.key===key));
  let tab,captured=0,processed=0,total=0;const failures=[];const started=Date.now();
  let currentPhase='Preparando lectura';
  const progress=async current=>{
@@ -24,7 +31,7 @@ async function scanDirectSource(origin,source,continuing){
  };
  const heartbeat=setInterval(()=>progress(currentPhase).catch(()=>{}),10000);
  try{
-  await progress(discover?'Descubriendo competiciones públicas':'Cargando LaLiga de Betfair');
+  await progress(discover?'Descubriendo competiciones públicas':'Cargando '+known[0].name+' de Betfair');
   tab=await chrome.tabs.create({url:!discover&&known.length?known[0].url:wina?'https://www.winamax.es/apuestas-deportivas/sports/1':'https://www.betfair.es/apuestas/f%C3%BAtbol/s-1',active:false});
   let result={ok:true,competitions:known};
   if(discover){
@@ -35,6 +42,7 @@ async function scanDirectSource(origin,source,continuing){
     result=await retryEmptyPublicPage(tab,result,()=>readerTask(tab.id,{type:'direct-discover',settings:configuration}),cancelled,progress);
     if(typeof savePublicDiagnostic==='function')await savePublicDiagnostic(origin,result);
    }
+   if(result?.blocked)throw Error(result.reason||'La web bloqueó la lectura pública.');
    if(known.length)result={ok:true,competitions:[...new Map([...known,...(result.competitions||[])].map(c=>[c.url,c])).values()]};
   }
   if(!result?.ok)throw Error(result?.reason||'No se pudo leer el catálogo público.');

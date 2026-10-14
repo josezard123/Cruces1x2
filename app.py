@@ -140,7 +140,8 @@ TEAM_ALIASES = {
     # Frequent club variants
     "bod glimt": "bodo glimt", "lask linz": "lask", "as roma": "roma",
     "oporto": "porto", "b munich": "bayern munchen", "leipzig": "rb leipzig",
-    "stuttgart": "vfb stuttgart", "aek": "aek atenas",
+    "stuttgart": "vfb stuttgart", "aek": "aek atenas", "aek de atenas": "aek atenas",
+    "shakhtar": "shakhtar donetsk",
     "como 1907": "como", "b dortmund": "dortmund",
     "man utd": "manchester united", "manchester utd": "manchester united",
     "man city": "manchester city", "manchester city fc": "manchester city",

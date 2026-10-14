@@ -33,7 +33,7 @@ function readExchangeCoupon(root=document,now=new Date()){
    // Competition coupons abbreviate a near-date row to "vie. 21:00".
    // Recover the explicit day/month only from that table's own visible card header.
    if(!match){
-    const short=normalized.match(/^(lun|mar|mié|mie|jue|vie|sáb|sab|dom)\.?\s+(\d{1,2}):(\d{2})$/);
+    const short=normalized.match(/^(lun|mar|mié|mie|jue|vie|sáb|sab|dom|hoy|ma[nñ]ana|today|tomorrow)\.?\s+(\d{1,2}):(\d{2})$/);
     const header=table.closest?.('.coupon-card')?.querySelector('.card-header-title')?.textContent?.trim().split('\n')[0]||'';
     const full=/^(?:lun|mar|mié|mie|jue|vie|sáb|sab|dom)\.?\s+(\d{1,2})\s+([a-zñ]+)\.?\s*$/i.exec(header);
     if(short&&full)match=[normalized,full[2].toLowerCase(),full[1],short[2],short[3]];
@@ -44,6 +44,12 @@ function readExchangeCoupon(root=document,now=new Date()){
    const year=Number(new Intl.DateTimeFormat('en',{timeZone:'Europe/Madrid',year:'numeric'}).format(now));
    let start=exchangeMadridDate(year,months[match[1]],Number(match[2]),Number(match[3]),Number(match[4]));
    if(start.getTime()<now.getTime()-86400000*180)start=exchangeMadridDate(year+1,months[match[1]],Number(match[2]),Number(match[3]),Number(match[4]));
+   if(/^(hoy|ma[nñ]ana|today|tomorrow)\b/.test(normalized)){
+    const calendar=d=>Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Madrid',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d).map(p=>[p.type,p.value]));
+    const today=calendar(now),shown=calendar(start);
+    const expected=new Date(Date.UTC(+today.year,+today.month-1,+today.day+(/^(ma[nñ]ana|tomorrow)\b/.test(normalized)?1:0)));
+    if(+shown.year!==expected.getUTCFullYear()||+shown.month!==expected.getUTCMonth()+1||+shown.day!==expected.getUTCDate())continue;
+   }
    if(start<=now||start-now>86400000*8)continue;
    inspection.future++;
    const lays={};
@@ -70,25 +76,33 @@ function readExchangeCoupon(root=document,now=new Date()){
  const nextUrl=next?.getAttribute('href')?new URL(next.getAttribute('href'),root.baseURI||location.href).href:null;
  return {events,next:nextUrl,market:'MATCH_ODDS',currency:'EUR',observed_at:now.toISOString(),inspection};
 }
+function waitForExchangeCoupon(milliseconds=30000){
+ // Background tabs throttle repeated timers. Listen to the actual Angular DOM
+ // updates and use one deadline, instead of sixty delayed half-second polls.
+ return new Promise(resolve=>{
+  let observer,timer,finished=false,lastPayload=null,reason='loading';
+  const finish=result=>{if(finished)return;finished=true;observer?.disconnect();clearTimeout(timer);resolve(result);};
+  const inspect=()=>{
+   try{
+    const payload=readExchangeCoupon();lastPayload=payload;
+    if(payload.events.length)finish({ok:true,payload});
+   }catch(error){reason=error.message==='market'?'market':'layout';}
+  };
+  observer=new MutationObserver(inspect);
+  observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,characterData:true});
+  timer=setTimeout(()=>{
+   if(lastPayload&&document.querySelector('table.coupon-table tbody tr')){
+    const d=lastPayload.inspection;
+    reason=!d?'no_lay':!d.headers||!d.teams?'layout':!d.dates?'date_format':!d.future?'time_window':!d.buttons?'lay_buttons':!d.prices?'price_format':'no_lay';
+   }
+   finish({ok:false,reason,inspection:lastPayload?.inspection});
+  },milliseconds);
+  inspect();
+ });
+}
 if(typeof chrome!=='undefined'&&chrome.runtime){chrome.runtime.onMessage.addListener((message,sender,respond)=>{
  if(message.type==='exchange-ping'){respond({ok:true,url:location.href});return false;}
  if(message.type!=='exchange-coupon')return false;
- (async()=>{
-  let reason='loading',lastPayload=null;
-  for(let i=0;i<60;i++){
-   try{
-    const payload=readExchangeCoupon();lastPayload=payload;
-    // Angular creates the table before filling its dates and price buttons.
-    // Never treat that empty shell as a completed coupon.
-    if(payload.events.length){respond({ok:true,payload});return;}
-   }catch(error){reason=error.message==='market'?'market':'layout';}
-   await new Promise(r=>setTimeout(r,500));
-  }
-  if(lastPayload&&document.querySelector('table.coupon-table tbody tr')){
-   const d=lastPayload.inspection;
-   reason=!d?'no_lay':!d.headers||!d.teams?'layout':!d.dates?'date_format':!d.future?'time_window':!d.buttons?'lay_buttons':!d.prices?'price_format':'no_lay';
-  }
-  respond({ok:false,reason,inspection:lastPayload?.inspection});
- })();return true;
+ waitForExchangeCoupon().then(respond);return true;
 });}
 if(typeof module!=='undefined')module.exports={readExchangeCoupon};

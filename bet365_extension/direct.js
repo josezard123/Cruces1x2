@@ -71,14 +71,16 @@ function parseDirectWina(snapshot,competition,settings,now=new Date()){
 }
 function parseDirectBf(snapshot,competition,settings,now=new Date()){
  const market=directClean(snapshot.market?.split('\n').pop());
- if(!['resultados','resultado 2 goles de ventaja'].includes(market))return [];
+ // Cruces requires the explicitly selected early-payout market. Never label
+ // ordinary match odds as the 2-goal promotion or silently fall back to them.
+ if(market!=='resultado 2 goles de ventaja')return [];
  const events=[];
  for(const row of snapshot.rows){
   const odds=directPrices(row.buttons),start=new Date(row.date),id=/\/e-(\d+)$/.exec(row.path)?.[1];
   if(!odds||!id||row.teams.length!==2||!/(?:GMT[+-]\d{4}|[zZ]$|[+-]\d{2}:\d{2}$)/.test(row.date||'')||!Number.isFinite(+start)||start<=now||start-now>settings.hours*3600000)continue;
   const url=new URL(row.path,'https://www.betfair.es/apuestas/');
   if(url.hostname!=='www.betfair.es'||url.search||url.hash||!/^\/apuestas\/f%C3%BAtbol\/[^/]+\/[^/]+\/e-\d+$/i.test(url.pathname))continue;
-  events.push({event_id:id,home:row.teams[0],away:row.teams[1],league:competition.name,country:competition.country,start:start.toISOString(),odds,market:'FULL_TIME_1X2',payout:market==='resultados'?'normal':'two_goals',source_url:url.href});
+  events.push({event_id:id,home:row.teams[0],away:row.teams[1],league:competition.name,country:competition.country,start:start.toISOString(),odds,market:'FULL_TIME_1X2',payout:'two_goals',source_url:url.href});
  }
  return events;
 }
@@ -145,13 +147,12 @@ async function readDirectCompetition(competition,settings){
    selector.click();await directWait(()=>document.querySelector('[role="radio"],input[type="radio"]'));
    const options=[...document.querySelectorAll('[role="radio"],input[type="radio"]')];
    const enhanced=options.find(n=>directClean(n.getAttribute('aria-label')||(n.id?document.querySelector('label[for="'+n.id+'"]')?.innerText:'')||n.parentElement.parentElement?.innerText)==='resultado 2 goles de ventaja');
-   const normal=options.find(n=>directClean(n.getAttribute('aria-label')||(n.id?document.querySelector('label[for="'+n.id+'"]')?.innerText:'')||n.parentElement.parentElement?.innerText)==='resultados');
-   if(!(enhanced||normal))throw Error('No apareció el mercado de resultado final.');
-   (enhanced||normal).click();
-   await directWait(()=>['resultado 2 goles de ventaja','resultados'].includes(directClean(directBfSnapshot().market?.split('\n').pop())));
+   if(!enhanced)throw Error('No apareció Resultado — 2 goles de ventaja.');
+   enhanced.click();
+   await directWait(()=>directClean(directBfSnapshot().market?.split('\n').pop())==='resultado 2 goles de ventaja');
   }
  }
- await directWait(()=>wina?document.querySelector('[data-testid^="match-card-"] .odd-button-value'):document.querySelector('a[href*="/e-"] button')||document.querySelector('[class*="inlineSportsbookMarket"] button'));
+ await directWait(()=>wina?document.querySelector('[data-testid^="match-card-"] .odd-button-value'):directBfSnapshot().rows.some(row=>directPrices(row.buttons)));
  const events=new Map();
  const anchor=document.querySelector(wina?'[data-testid^="match-card-"]':'a[href*="/e-"]');
  const grid=directScrollHost(anchor);

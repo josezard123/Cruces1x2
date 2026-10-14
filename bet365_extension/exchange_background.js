@@ -1,3 +1,13 @@
+async function waitForExchangeReader(ask,expectedUrl){
+ // Creating a tab does not mean its document_idle content script is ready.
+ // Missing receivers and the old document during navigation are transient.
+ for(let attempt=0,deadline=Date.now()+30000;attempt<60&&Date.now()<deadline;attempt++){
+  try{const reply=await ask({type:'exchange-ping'},5000);if(reply?.ok&&reply.url===expectedUrl)return;}
+  catch(_){}
+  await new Promise(resolve=>setTimeout(resolve,500));
+ }
+ throw Error('connection');
+}
 async function scanExchange(origin,source){
  let tab,captured=0,partial=false,read=0,teams=0,inspection={};
  const status=state=>fetch(origin+'/freebets/status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({state,captured,read,teams,inspection})});
@@ -8,16 +18,19 @@ async function scanExchange(origin,source){
   if(!data.targets?.length){await status('empty');return {ok:false,reason:'empty'};}
   await status('reading');
   const laLigaOnly=data.targets.every(t=>t.league_key==='laliga');
-  tab=await chrome.tabs.create({url:laLigaOnly?'https://www.betfair.es/exchange/plus/es/f%C3%BAtbol/la-liga-espa%C3%B1ola-apuestas-117':'https://www.betfair.es/exchange/plus/es/f%C3%BAtbol-apuestas-1',active:false});
+  const championsOnly=data.targets.every(t=>t.league_key==='ucl');
+  // Both competition links were verified in the public Exchange navigation.
+  // Avoid walking the general football catalogue for a single known league.
+  const firstUrl=laLigaOnly?'https://www.betfair.es/exchange/plus/es/f%C3%BAtbol/la-liga-espa%C3%B1ola-apuestas-117':championsOnly?'https://www.betfair.es/exchange/plus/es/f%C3%BAtbol/uefa-champions-league-apuestas-228':'https://www.betfair.es/exchange/plus/es/f%C3%BAtbol-apuestas-1';
+  tab=await chrome.tabs.create({url:firstUrl,active:false});
+  let expectedUrl=firstUrl;
   const ask=(message,limit=90000)=>typeof readerTask==='function'?readerTask(tab.id,message,limit):chrome.tabs.sendMessage(tab.id,message);
   const canonical=value=>{let n=value.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').trim();n=data.aliases[n]||n;n=n.split(' ').filter(w=>!['fc','cf','afc','sc','ac','club','futbol','football'].includes(w)).join(' ');return (data.aliases[n]||n).replace(/ club/g,'');};
   const found=new Set(),visited=new Set();
   for(let page=0;page<20;page++){
    let response;
-   for(let attempt=0;attempt<50;attempt++){
-    try{const ping=await ask({type:'exchange-ping'},5000);if(ping?.ok){response=await ask({type:'exchange-coupon'});break;}}catch(_){await status('connection');return {ok:false,captured,reason:'connection'};}
-    await new Promise(r=>setTimeout(r,500));
-   }
+   try{await waitForExchangeReader(ask,expectedUrl);response=await ask({type:'exchange-coupon'});}
+   catch(_){await status('connection');return {ok:false,captured,reason:'connection'};}
    inspection=response?.inspection||response?.payload?.inspection||{};
    if(!response?.ok){const reason=response?.reason||'connection';await status(reason);return {ok:false,captured,reason};}
    const payload=response.payload;
@@ -36,9 +49,7 @@ async function scanExchange(origin,source){
    const next=new URL(payload.next);
    if(next.origin!=='https://www.betfair.es'||next.search||next.hash||!/^\/exchange\/plus\/es\/fútbol-apuestas-1(?:\/\d+)?$/.test(decodeURIComponent(next.pathname)))break;
    if(page===19){partial=true;break;}
-   visited.add(payload.next);await chrome.tabs.update(tab.id,{url:payload.next});
-   // Wait for the new URL/document before reading another coupon.
-   for(let n=0;n<50;n++){try{const ping=await chrome.tabs.sendMessage(tab.id,{type:'exchange-ping'});if(ping?.url===payload.next)break;}catch(_){}await new Promise(r=>setTimeout(r,500));}
+   visited.add(payload.next);expectedUrl=payload.next;await chrome.tabs.update(tab.id,{url:expectedUrl});
   }
   const reason=!captured?(read===0?'no_lay':teams===0?'teams':'time'):undefined;
   await status(reason||(partial?'partial':'done'));return {ok:true,captured,partial,reason,read};
