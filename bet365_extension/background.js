@@ -27,6 +27,13 @@ async function selectBetTarget(tabId,target,aliases) {
     return {ok:false,reason:'Bet365 no respondió a la búsqueda; no se confirmó la apertura del partido.'};
   }
 }
+async function searchBetTeam(tabId,team,target,aliases) {
+  try{
+    const url='https://www.bet365.es/#/AX/K%5E'+encodeURIComponent(team)+'/';
+    await chrome.tabs.update(tabId,{url});await waitForReader(tabId,url);
+    return await selectBetTarget(tabId,target,aliases);
+  }catch(_){return {ok:false,reason:'No se pudo cargar esta búsqueda de Bet365.'};}
+}
 async function scanAutomatically(origin,filter={},source='bet365',continuing=false) {
   const cancelled=async()=> (await(await fetch(origin+'/update-status')).json()).cancelled===true;
   if(await cancelled())return {ok:false,captured:0,reason:'cancelled'};
@@ -71,11 +78,6 @@ async function scanAutomatically(origin,filter={},source='bet365',continuing=fal
       let error='';
       try {
         // New document/route per search; reconnect after every navigation.
-        if(!sportium){
-          const searchUrl='https://www.bet365.es/#/AX/K%5E'+encodeURIComponent(target.home)+'/';
-          await chrome.tabs.update(tab.id,{url:searchUrl});
-          await waitForReader(tab.id,searchUrl);
-        }
         let selected;
         if(sportium){
           const found=catalogue.filter(event=>/^https:\/\/www\.sportium\.es\/apuestas\/sports\/soccer\/events\/\d+$/.test(event.source_url)&&
@@ -87,16 +89,21 @@ async function scanAutomatically(origin,filter={},source='bet365',continuing=fal
             selected={ok:true,verifiedStart:found[0].start,expectedEventId:found[0].event_id};
           }
         }else {
-          selected=await selectBetTarget(tab.id,target,data.aliases);
+          selected=await searchBetTeam(tab.id,target.home,target,data.aliases);
           await savePublicDiagnostic(origin,selected);
           selected=await retryEmptyPublicPage(tab,selected,()=>selectBetTarget(tab.id,target,data.aliases),cancelled,progress);
           await savePublicDiagnostic(origin,selected);
           const original=target.home.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').trim();
           if(!selected?.ok&&!selected?.blocked&&target.canonical_home!==original&&!(await cancelled())){
             // One fallback for known name variants; the teams and date still need verification.
-            const alternate='https://www.bet365.es/#/AX/K%5E'+encodeURIComponent(target.canonical_home)+'/';
-            await chrome.tabs.update(tab.id,{url:alternate});await waitForReader(tab.id,alternate);
-            selected=await selectBetTarget(tab.id,target,data.aliases);
+            selected=await searchBetTeam(tab.id,target.canonical_home,target,data.aliases);
+            selected=await retryEmptyPublicPage(tab,selected,()=>selectBetTarget(tab.id,target,data.aliases),cancelled,progress);
+            await savePublicDiagnostic(origin,selected);
+          }
+          if(!selected?.ok&&!selected?.blocked&&!(await cancelled())){
+            // One final search by the opponent avoids depending on a home
+            // spelling with accents or a slash. Both teams are still verified.
+            selected=await searchBetTeam(tab.id,target.away,target,data.aliases);
             selected=await retryEmptyPublicPage(tab,selected,()=>selectBetTarget(tab.id,target,data.aliases),cancelled,progress);
             await savePublicDiagnostic(origin,selected);
           }
@@ -118,7 +125,10 @@ async function scanAutomatically(origin,filter={},source='bet365',continuing=fal
             result=await retryEmptyPublicPage(tab,result,()=>readerTask(tab.id,{type:'read-target',target:readTarget,aliases:data.aliases}),cancelled,progress);
             await savePublicDiagnostic(origin,result);
           }
-          if(!result?.ok)error=result?.reason||'No apareció Resultado final.';
+          if(!result?.ok){
+            error=result?.reason||'No apareció Resultado final.';
+            if(result?.blocked){failures.push(match+': '+error);break;}
+          }
           else {
             if(await cancelled())break;
             const received=await fetch(origin+'/'+source+'-scan-observation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(result.payload)});
