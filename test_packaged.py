@@ -46,7 +46,12 @@ for path in ('/','/freebets','/static/app_updates.js','/bet365-extension','/bet3
             assert b'data-cruces-installed="1"' in body and b'17.25' in body
         if path=='/bet365-extension':
             assert str(installed/'lector').encode() in body
+        if path=='/freebets':
+            assert b'value="retabet"' in body and b'RETAbet ES' in body
 assert (installed/'lector'/'manifest.json').exists()
+manifest=json.loads((installed/'lector'/'manifest.json').read_text(encoding='utf-8'))
+assert 'https://apuestas.retabet.es/deportes/futbol/*' in manifest['host_permissions']
+assert (installed/'lector'/'retabet.js').is_file() and (installed/'lector'/'retabet_background.js').is_file()
 assert json.loads((data/'config.json').read_text()) == config
 process.wait(timeout=40)
 with socket.socket() as sock:

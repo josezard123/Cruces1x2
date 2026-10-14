@@ -172,6 +172,7 @@ function directDiagnostic(phase) {
 }
 if(typeof chrome!=='undefined')chrome.runtime.onMessage.addListener((message,sender,respond)=>{
  if(message.type==='reader-ping'){respond({ok:true,url:location.href});return false;}
+ if(!['www.winamax.es','www.betfair.es'].includes(location.hostname))return false;
  if(message.type==='direct-discover'){discoverDirect(message.settings).then(competitions=>respond({ok:true,competitions})).catch(error=>respond({ok:false,blocked:/bloqueó/.test(error.message),reason:error.message,diagnostic:directDiagnostic('discover')}));return true;}
  if(message.type==='direct-read'){readDirectCompetition(message.competition,message.settings).then(payload=>respond({ok:true,payload,diagnostic:directDiagnostic('coupon')})).catch(error=>respond({ok:false,blocked:/bloqueó/.test(error.message),reason:error.message,diagnostic:directDiagnostic('coupon')}));return true;}
  return false;

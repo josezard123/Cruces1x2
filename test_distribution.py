@@ -15,8 +15,8 @@ class DistributionTests(unittest.TestCase):
         self.assertNotEqual(app.canonical_team('AS Roma U19'),app.canonical_team('Roma'))
 
     def release(self):
-        return {'tag_name':'v4.4.0','assets':[{'name':'Cruces-Setup-4.4.0.exe','size':3,
-            'browser_download_url':'https://github.com/josezard123/Cruces1x2/releases/download/v4.4.0/Cruces-Setup-4.4.0.exe',
+        return {'tag_name':'v4.5.0','assets':[{'name':'Cruces-Setup-4.5.0.exe','size':3,
+            'browser_download_url':'https://github.com/josezard123/Cruces1x2/releases/download/v4.5.0/Cruces-Setup-4.5.0.exe',
             'digest':'sha256:'+hashlib.sha256(b'new').hexdigest()}]}
 
     def test_release_validation(self):
@@ -44,7 +44,7 @@ class DistributionTests(unittest.TestCase):
             self.assertEqual(updater.download_installer(info,folder).read_bytes(),b'new')
             response.iter_content.return_value=[b'bad']
             with self.assertRaises(ValueError):updater.download_installer(info,folder)
-            self.assertEqual((Path(folder)/'Cruces-Setup-4.4.0.exe').read_bytes(),b'new')
+            self.assertEqual((Path(folder)/'Cruces-Setup-4.5.0.exe').read_bytes(),b'new')
             self.assertFalse(list(Path(folder).glob('*.part')))
 
     def test_bad_redirect(self):

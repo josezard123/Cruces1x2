@@ -61,7 +61,7 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
  const origin=new URL(sender.url).origin;
  if(!['http://127.0.0.1:8802','http://127.0.0.1:8803'].includes(origin))return false;
  if(activeScan){respond({ok:false,reason:'busy'});return false;}
- if(!['bet365','winamax_es','betfair_sb','sportium'].includes(message.source))return false;
+ if(!['bet365','winamax_es','betfair_sb','sportium','retabet'].includes(message.source))return false;
  activeScan=scanExchange(origin,message.source).finally(()=>{activeScan=null;});
  activeScan.then(respond).catch(()=>respond({ok:false}));return true;
 });

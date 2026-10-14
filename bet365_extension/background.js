@@ -1,5 +1,5 @@
 let activeScan=null;
-importScripts('recovery_background.js','exchange_background.js','direct_background.js');
+importScripts('recovery_background.js','exchange_background.js','direct_background.js','retabet_background.js');
 async function savePublicDiagnostic(origin,result) {
   if(!result?.diagnostic)return;
   try{await fetch(origin+'/reader-diagnostic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(result.diagnostic)});}catch(_){}
@@ -151,9 +151,9 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
   if(sender.url && ['http://127.0.0.1:8802','http://127.0.0.1:8803'].includes(new URL(sender.url).origin) && message.type==='automatic-bet365-scan') {
     if(activeScan){respond({ok:false,reason:'busy'});return false;}
     activeScan=(async()=>{
-      const sources=[...new Set(message.filter?.sources||['bet365'])].filter(s=>['winamax_es','betfair_sb','bet365','sportium'].includes(s));
+      const sources=[...new Set(message.filter?.sources||['bet365'])].filter(s=>['winamax_es','betfair_sb','bet365','sportium','retabet'].includes(s));
       let captured=0;const failures=[];
-      for(const [index,source] of sources.entries()){const result=await (['winamax_es','betfair_sb'].includes(source)?scanDirectSource(new URL(sender.url).origin,source,index<sources.length-1):scanAutomatically(new URL(sender.url).origin,message.filter||{},source,index<sources.length-1));if(!result.ok)return result;captured+=result.captured;failures.push(...result.failures);}
+      for(const [index,source] of sources.entries()){const result=await (source==='retabet'?scanRetabet(new URL(sender.url).origin,index<sources.length-1):['winamax_es','betfair_sb'].includes(source)?scanDirectSource(new URL(sender.url).origin,source,index<sources.length-1):scanAutomatically(new URL(sender.url).origin,message.filter||{},source,index<sources.length-1));if(!result.ok)return result;captured+=result.captured;failures.push(...result.failures);}
       return {ok:true,captured,failures};
     })().finally(()=>{activeScan=null;});
     activeScan.then(respond).catch(()=>respond({ok:false,captured:0,reason:'reader-error'}));

@@ -21,7 +21,7 @@ def settings():
 @bp.post('/direct-observation/<source>')
 def observation(source):
     a=_core
-    if source not in ('winamax_es','betfair_sb'):
+    if source not in ('winamax_es','betfair_sb','retabet'):
         return {'ok':False},400
     if a._update_cancel.is_set():return {'ok':False,'reason':'Actualización detenida.'},409
     try:
@@ -36,9 +36,10 @@ def observation(source):
                 raise ValueError()
             if source=='winamax_es' and not __import__('re').fullmatch(r'/apuestas-deportivas/match/\d+',path):raise ValueError()
             if source=='betfair_sb' and not __import__('re').fullmatch(r'/apuestas/fútbol/[^/]+/[^/]+/e-\d+',path):raise ValueError()
+            if source=='retabet' and not __import__('re').fullmatch(r'/deportes/futbol/[^/]+/[^/]+/[^/]+/\d+',path):raise ValueError()
             if event.get('market')!='FULL_TIME_1X2' or event.get('payout') not in ('normal','two_goals'):raise ValueError()
             if source=='winamax_es' and event['payout']!='normal':raise ValueError()
-            if source=='betfair_sb' and event['payout']!='two_goals':raise ValueError()
+            if source in ('betfair_sb','retabet') and event['payout']!='two_goals':raise ValueError()
             start=a.parse_dt(event['start'])
             if not start:raise ValueError()
             home,away=event['home'],event['away']
@@ -46,12 +47,19 @@ def observation(source):
             odds={sign:float(event['odds'][sign]) for sign in ('1','X','2')}
             if any(isinstance(event['odds'][sign],bool) for sign in odds) or not all(math.isfinite(v) and 1<v<=1000 for v in odds.values()):raise ValueError()
             event_id=str(event['event_id'])
-            if not event_id.isdigit() or not path.endswith('/'+event_id if source=='winamax_es' else '/e-'+event_id):raise ValueError()
+            if not event_id.isdigit() or not path.endswith('/e-'+event_id if source=='betfair_sb' else '/'+event_id):raise ValueError()
             if event_id in seen:raise ValueError()
             seen.add(event_id)
             origin='Web '+a.SOURCE_DEFS[source]['label']+' · '+('Resultado — 2 goles de ventaja' if event['payout']=='two_goals' else '1X2 normal')
             q=a.SourceQuote(source,a.SOURCE_DEFS[source]['label'],event_id,home,away,event['league'],event['country'],start,odds,
                             direct_url=event['source_url'],received_at=stamp,updated=stamp.isoformat(),origin=origin)
+            if source=='retabet':
+                a.restore_quote_cache()
+                references=[g.quotes['winamax_es'] for g in a._last_groups if 'winamax_es' in g.quotes]
+                matches=[r for r in references if a.canonical_team(r.home)==a.canonical_team(home)
+                         and a.canonical_team(r.away)==a.canonical_team(away)
+                         and abs((r.start-start).total_seconds())<=60 and a.classify_league(r)==a.classify_league(q)]
+                if len(matches)!=1:raise ValueError()
             if a.classify_league(q) in cfg['selected_leagues'] and a.quote_in_window(q,cfg['hours']):accepted.append(q)
         # Commit only validated public fields and retain existing quotes on partial scans.
         with a._web_import_lock:

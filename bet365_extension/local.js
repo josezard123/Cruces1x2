@@ -1,6 +1,6 @@
 // Exchange public match tasks only; never read forms or credentials.
 document.documentElement.dataset.crucesReader='ready';
-document.documentElement.dataset.crucesReaderVersion='2.0.8';
+document.documentElement.dataset.crucesReaderVersion='2.1.0';
 document.addEventListener('cruces-read-exchange',async event=>{
   try {
     const result=await chrome.runtime.sendMessage({type:'automatic-exchange-scan',source:String(event.detail?.source||'winamax_es')});
@@ -10,7 +10,7 @@ document.addEventListener('cruces-read-exchange',async event=>{
 document.dispatchEvent(new CustomEvent('cruces-reader-ready'));
 document.addEventListener('cruces-automatic-bet365',async event=>{
   try {
-    const sources=Array.isArray(event.detail?.sources)?event.detail.sources.filter(s=>['winamax_es','betfair_sb','bet365','sportium'].includes(s)):['bet365'];
+    const sources=Array.isArray(event.detail?.sources)?event.detail.sources.filter(s=>['winamax_es','betfair_sb','bet365','sportium','retabet'].includes(s)):['bet365'];
     const result=await chrome.runtime.sendMessage({type:'automatic-bet365-scan',filter:{home:String(event.detail?.home||'').slice(0,120),away:String(event.detail?.away||'').slice(0,120),sources,missing:event.detail?.missing===true}});
     document.dispatchEvent(new CustomEvent('cruces-automatic-finished',{detail:result}));
   } catch(_) {document.dispatchEvent(new CustomEvent('cruces-automatic-finished',{detail:{ok:false,reason:'reader-error'}}));}

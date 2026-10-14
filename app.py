@@ -59,6 +59,7 @@ SOURCE_DEFS: dict[str, dict[str, str]] = {
         "site": "https://www.betfair.es",
     },
     "sportium": {"label":"Sportium ES", "site":"https://www.sportium.es", "endpoint":""},
+    "retabet": {"label":"RETAbet ES", "site":"https://apuestas.retabet.es", "endpoint":""},
 }
 
 LEAGUES: dict[str, str] = {
@@ -153,7 +154,7 @@ TEAM_ALIASES = {
     "deportivo": "deportivo de la coruna", "deportivo de a coruna": "deportivo de la coruna",
     "deportivo la coruna": "deportivo de la coruna", "rc deportivo": "deportivo de la coruna",
     "racing de santander": "racing santander", "racing club de santander": "racing santander",
-    "celta de vigo": "celta vigo",
+    "celta de vigo": "celta vigo", "celta": "celta vigo", "f c barcelona": "barcelona",
     "rcd espanyol": "espanyol", "espanol": "espanyol",
     "deportivo alaves": "alaves",
     "real betis seville": "real betis", "betis": "real betis",
@@ -501,6 +502,7 @@ def fetch_source(source: str, api_key: str, hours: int, trace: list[dict[str, An
     Reservations survive restarts. A 429 stops immediately without retries.
     """
     if source=='sportium': return read_browser_web(source,hours)
+    if source=='retabet': raise PulseScoreError('RETAbet se obtiene mediante el lector directo del navegador.')
     if source == "bet365" and read_config().get("bet365_mode") == "web":
         return read_bet365_web(hours)
     if source == 'bet365' and read_config().get('bet365_mode') in ('auto','browser_auto'):
@@ -867,7 +869,7 @@ def make_direct_url(source: str, slug: str) -> str:
         return ""
     if slug.startswith("http://") or slug.startswith("https://"):
         host = urlparse(slug).hostname or ""
-        allowed = {"bet365": ("bet365.es", "bet365.com"), "winamax_es": ("winamax.es",), "betfair_sb": ("betfair.es", "betfair.com"), "sportium":("sportium.es",)}[source]
+        allowed = {"bet365": ("bet365.es", "bet365.com"), "winamax_es": ("winamax.es",), "betfair_sb": ("betfair.es", "betfair.com"), "sportium":("sportium.es",), "retabet":("apuestas.retabet.es",)}[source]
         if not any(host == domain or host.endswith("."+domain) for domain in allowed):
             return ""
         return slug
@@ -946,7 +948,7 @@ def match_score(q: SourceQuote, g: MatchGroup) -> float:
 def group_quotes(all_quotes: dict[str, list[SourceQuote]], selected_leagues: set[str], hours: int) -> list[MatchGroup]:
     groups: list[MatchGroup] = []
     # Seed in a stable source order. Using Winamax ES first is useful because it is explicitly the Spanish board.
-    order = ["winamax_es", "bet365", "betfair_sb", "sportium"]
+    order = ["winamax_es", *[s for s in SOURCE_DEFS if s!='winamax_es']]
     for source in order:
         for q in all_quotes.get(source, []):
             key = classify_league(q)
@@ -1326,6 +1328,7 @@ def bet365_extension_download():
 
 
 @app.get('/bet365-targets')
+@app.get('/retabet-targets')
 def bet365_targets():
     restore_quote_cache()
     cfg=read_config()
@@ -1334,8 +1337,8 @@ def bet365_targets():
     for group in _last_groups:
         q=group.quotes.get('winamax_es')
         if q and group.league_key in cfg['selected_leagues'] and quote_in_window(q,cfg['hours']):
-            source=request.args.get('source')
-            if request.args.get('missing')=='1' and source in ('bet365','sportium'):
+            source='retabet' if request.path=='/retabet-targets' else request.args.get('source')
+            if request.args.get('missing')=='1' and source in ('bet365','sportium','retabet'):
                 existing=group.quotes.get(source)
                 if existing and quote_is_fresh(existing) and abs((q.start-existing.start).total_seconds())<=900: continue
             if request.args.get('home') and request.args.get('away') and (canonical_team(q.home)!=canonical_team(request.args['home']) or canonical_team(q.away)!=canonical_team(request.args['away'])):
@@ -1344,6 +1347,7 @@ def bet365_targets():
                 outside_window+=1
                 continue
             targets.append({'home':q.home,'away':q.away,'start':q.start.isoformat(),
+                            'league_key':group.league_key,
                             'canonical_home':canonical_team(q.home),'canonical_away':canonical_team(q.away)})
     return {'targets':targets,'aliases':TEAM_ALIASES,'outside_window':outside_window,'leagues':cfg['selected_leagues']}
 
@@ -1436,7 +1440,7 @@ def refresh_bet365_only():
     try:
         restore_quote_cache()
         cfg=read_config()
-        sources=['sportium'] if request.path=='/refresh-sportium' else (['winamax_es','betfair_sb','bet365','sportium'] if cfg.get('odds_mode')=='browser_direct' else ['bet365','sportium']) if request.path=='/refresh-browser' else ['bet365']
+        sources=['sportium'] if request.path=='/refresh-sportium' else (['winamax_es','betfair_sb','bet365','sportium','retabet'] if cfg.get('odds_mode')=='browser_direct' else ['bet365','sportium']) if request.path=='/refresh-browser' else ['bet365']
         if cfg.get('bet365_mode')=='browser_auto' or request.path!='/refresh-bet365':
             _last_result.setdefault('stats',{})['api_calls']=0
             return render_home(coverage=coverage_rows(_last_groups),automatic_scan=True,
@@ -1564,7 +1568,7 @@ def update():
             _browser_results.clear()
             _last_result.setdefault('stats',{})['api_calls']=0
             return render_home(coverage=coverage_rows(_last_groups),automatic_scan=True,
-                               automatic_filter={'sources':['winamax_es','betfair_sb','bet365','sportium']},
+                               automatic_filter={'sources':['winamax_es','betfair_sb','bet365','sportium','retabet']},
                                message='Leyendo las casas directamente en el navegador · 0 peticiones a PulseScore.')
         key = get_api_key()
         if not key:

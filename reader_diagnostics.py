@@ -49,7 +49,7 @@ def path(value):
 def validate(data):
     exact(data, ('schema', 'reader_version', 'source', 'phase', 'target', 'event_id',
                  'counts', 'nodes', 'competitions', 'rows', 'cards'))
-    if type(data['schema']) is not int or data['schema'] != 1 or data['reader_version'] not in ('2.0.5', '2.0.6', '2.0.7', '2.0.8'):
+    if type(data['schema']) is not int or data['schema'] != 1 or data['reader_version'] not in ('2.0.5', '2.0.6', '2.0.7', '2.0.8', '2.1.0'):
         raise ValueError()
     allowed = {'bet365': ('search', 'event'), 'betfair_sb': ('discover', 'coupon'),
                'winamax_es': ('discover', 'coupon'), 'sportium': ('catalogue',)}
