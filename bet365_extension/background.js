@@ -15,23 +15,28 @@ async function savePublicDiagnostic(origin,result) {
   if(!result?.diagnostic)return;
   try{await fetch(origin+'/reader-diagnostic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(result.diagnostic)});}catch(_){}
 }
-async function waitForReader(tabId,expectedUrl) {
-  for(const deadline=Date.now()+30000;Date.now()<deadline;) {
+async function waitForReader(tabId,expectedUrl,deadline=Date.now()+30000) {
+  for(deadline=Math.min(deadline,Date.now()+30000);Date.now()<deadline;) {
     try {
-      const reply=await readerTask(tabId,{type:'reader-ping'},5000);
+      const reply=await readerTask(tabId,{type:'reader-ping'},Math.max(1,Math.min(5000,deadline-Date.now())));
       if(reply?.ok && (!expectedUrl||reply.url===expectedUrl)) return;
     } catch(_) {}
     await new Promise(resolve=>setTimeout(resolve,500));
   }
   throw new Error('No se pudo conectar con el lector tras cargar la página.');
 }
+function requireUpcomingTarget(target){
+  if(!Number.isFinite(Date.parse(target.start))||Date.parse(target.start)<=Date.now())throw Error('El partido ya ha comenzado; se omite la lectura prepartido.');
+  if(target.readDeadline&&Date.now()>=target.readDeadline)throw Error('Límite de espera de este partido alcanzado; se continúa con los demás.');
+}
 async function selectBetTarget(tabId,target,aliases) {
-  try{return await readerTask(tabId,{type:'scan-target',target,aliases});}
+  requireUpcomingTarget(target);
+  try{return await readerTask(tabId,{type:'scan-target',target,aliases},Math.min(20000,(target.readDeadline||Date.now()+19000)-Date.now()+1000));}
   catch(_){
     // A genuine event navigation can close the response channel. Confirm the
     // actual public event route instead of treating every timeout as success.
     try{
-      await waitForReader(tabId);
+      requireUpcomingTarget(target);await waitForReader(tabId,undefined,target.readDeadline);
       const ping=await readerTask(tabId,{type:'reader-ping'},5000),url=new URL(ping?.url||'');
       if(ping?.ok&&url.protocol==='https:'&&url.hostname==='www.bet365.es'&&/\/E\d+\//.test(url.hash))return {ok:true,navigated:true};
     }catch(_){}
@@ -40,8 +45,9 @@ async function selectBetTarget(tabId,target,aliases) {
 }
 async function searchBetTeam(tabId,team,target,aliases) {
   try{
+    requireUpcomingTarget(target);
     const url='https://www.bet365.es/#/AX/K%5E'+encodeURIComponent(team)+'/';
-    await chrome.tabs.update(tabId,{url});await waitForReader(tabId,url);
+    await chrome.tabs.update(tabId,{url});await waitForReader(tabId,url,target.readDeadline);
     return await selectBetTarget(tabId,target,aliases);
   }catch(_){return {ok:false,reason:'No se pudo cargar esta búsqueda de Bet365.'};}
 }
@@ -81,13 +87,15 @@ async function scanAutomatically(origin,filter={},source='bet365',continuing=fal
       catalogue=listed.events||[];
       failures.push(...(listed.warnings||[]));
     }
-    for(const target of data.targets) {
+    for(const reference of data.targets) {
       if(await cancelled())break;
       if(Date.now()-started>600000){failures.push('Tiempo máximo alcanzado; cobertura parcial.');break;}
+      const target=sportium?reference:{...reference,readDeadline:Math.min(started+600000,Date.now()+75000)};
       const match=`${target.home} — ${target.away}`;
       await progress('Buscando '+match);
       let error='';
       try {
+        requireUpcomingTarget(target);
         // New document/route per search; reconnect after every navigation.
         let selected;
         if(sportium){
@@ -106,12 +114,14 @@ async function scanAutomatically(origin,filter={},source='bet365',continuing=fal
           await savePublicDiagnostic(origin,selected);
           const original=target.home.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').trim();
           if(!selected?.ok&&!selected?.blocked&&target.canonical_home!==original&&!(await cancelled())){
+            requireUpcomingTarget(target);
             // One fallback for known name variants; the teams and date still need verification.
             selected=await searchBetTeam(tab.id,target.canonical_home,target,data.aliases);
             selected=await retryEmptyPublicPage(tab,selected,()=>selectBetTarget(tab.id,target,data.aliases),cancelled,progress);
             await savePublicDiagnostic(origin,selected);
           }
           if(!selected?.ok&&!selected?.blocked&&!(await cancelled())){
+            requireUpcomingTarget(target);
             // One final search by the opponent avoids depending on a home
             // spelling with accents or a slash. Both teams are still verified.
             selected=await searchBetTeam(tab.id,target.away,target,data.aliases);
@@ -123,17 +133,22 @@ async function scanAutomatically(origin,filter={},source='bet365',continuing=fal
           error=selected?.reason||'No se encontró el partido.';
           if(selected?.blocked){failures.push(match+': '+error);break;}
         } else {
+          requireUpcomingTarget(target);
           const readTarget=sportium?{...target,verifiedStart:selected.verifiedStart,expectedEventId:selected.expectedEventId}:target;
-          await waitForReader(tab.id);
-          let result=await readerTask(tab.id,{type:'read-target',target:readTarget,aliases:data.aliases}).catch(()=>null);
+          const read=()=>{
+            requireUpcomingTarget(target);
+            return readerTask(tab.id,{type:'read-target',target:readTarget,aliases:data.aliases},sportium?90000:Math.max(1,target.readDeadline-Date.now()+1000));
+          };
+          await waitForReader(tab.id,undefined,target.readDeadline);
+          let result=await read().catch(()=>null);
           if(!result) {
             // A full document navigation closes the first message channel.
-            await waitForReader(tab.id);
-            result=await readerTask(tab.id,{type:'read-target',target:readTarget,aliases:data.aliases});
+            requireUpcomingTarget(target);await waitForReader(tab.id,undefined,target.readDeadline);
+            result=await read();
           }
           await savePublicDiagnostic(origin,result);
           if(!sportium){
-            result=await retryEmptyPublicPage(tab,result,()=>readerTask(tab.id,{type:'read-target',target:readTarget,aliases:data.aliases}),cancelled,progress);
+            result=await retryEmptyPublicPage(tab,result,read,cancelled,progress);
             await savePublicDiagnostic(origin,result);
           }
           if(!result?.ok){
@@ -147,7 +162,7 @@ async function scanAutomatically(origin,filter={},source='bet365',continuing=fal
             else error=(await received.json().catch(()=>null))?.reason||'Fecha, equipos o mercado no verificados por la app.';
           }
         }
-      } catch(_){error='Se perdió la conexión con la página de este partido.';}
+      } catch(problem){error=/ya ha comenzado|Límite de espera/.test(problem.message)?problem.message:'Se perdió la conexión con la página de este partido.';}
       if(error)failures.push(match+': '+error);
       processed++;
       await progress(match,error);

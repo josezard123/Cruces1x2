@@ -93,11 +93,25 @@ function readSportiumCatalogue(leagues=[]) {
   return [...events.values()];
 }
 function sportiumListSignature() {
-  return [...document.querySelectorAll('.ta-EventListGroup .ta-EventListItem a.ta-EventListItemDetails')].map(n=>n.getAttribute('href')).join('|');
+  return [...document.querySelectorAll('.ta-EventListGroup .ta-GroupHeader')].map(n=>n.innerText.trim()).join('|')+'::'+
+    [...document.querySelectorAll('.ta-EventListGroup .ta-EventListItem a.ta-EventListItemDetails')].map(n=>n.getAttribute('href')).join('|');
 }
-async function readCompleteSportiumCatalogue(leagues=[]) {
+async function readCompleteSportiumCatalogue(leagues=[],warnings=[]) {
   const collected=new Map(),collect=()=>{for(const event of readSportiumCatalogue(leagues))collected.set(event.source_url,event);};
-  collect();
+  const expanded=new Set();
+  const collectGroups=async()=>{
+    // Virtual lists mount new headers while scrolling. Expand each selected
+    // competition once, including those absent from the first viewport.
+    for(const group of document.querySelectorAll('.ta-EventListGroup')){
+      const header=group.querySelector('.ta-GroupHeader'),label=header?.innerText.trim();
+      if(!header||!sportiumAllowedGroup(label,leagues)||group.querySelector('.ta-EventListItem')||expanded.has(label))continue;
+      expanded.add(label);header.click();
+      try{await sportiumWait(()=>group.querySelector('.ta-EventListItem'),8000);}
+      catch(error){if(/bloqueó/.test(error.message))throw error;warnings.push('No cargaron los partidos de '+label.slice(0,100));}
+    }
+    collect();
+  };
+  await collectGroups();
   const anchor=document.querySelector('.ta-EventListGroups');let scroller=null;
   for(let node=anchor;node;node=node.parentElement){
     if(node.clientHeight>0&&node.scrollHeight>node.clientHeight+2&&/auto|scroll/.test(getComputedStyle(node).overflowY)){scroller=node;break;}
@@ -105,8 +119,8 @@ async function readCompleteSportiumCatalogue(leagues=[]) {
   if(!scroller)return [...collected.values()];
   const move=async position=>{
     const before=sportiumListSignature();scroller.scrollTop=position;
-    try{await sportiumWait(()=>sportiumListSignature()!==before,1000);}catch(_){}
-    collect();
+    try{await sportiumWait(()=>sportiumListSignature()!==before,1000);}catch(error){if(/bloqueó/.test(error.message))throw error;}
+    await collectGroups();
   };
   if(scroller.scrollTop>0)await move(0);
   for(let page=0;page<20&&scroller.scrollTop+scroller.clientHeight<scroller.scrollHeight-2;page++){
@@ -124,14 +138,7 @@ async function sportiumCatalogue(aliases,leagues=[]) {
     if(/access denied|acceso denegado|verify you are human|verifica que eres humano/i.test(document.body.innerText))return {ok:false,blocked:true,reason:'Sportium bloqueó el acceso; lectura detenida.'};
     await sportiumWait(()=>document.querySelector('.ta-EventListGroups .ta-GroupHeader'));
     const warnings=[];
-    // Expand competition headers only, never odds or selections. Unrelated leagues stay closed.
-    for(const group of document.querySelectorAll('.ta-EventListGroup')) {
-      const header=group.querySelector('.ta-GroupHeader');
-      if(!header||!sportiumAllowedGroup(header.innerText,leagues)||group.querySelector('.ta-EventListItem'))continue;
-      header.click();
-      await sportiumWait(()=>group.querySelector('.ta-EventListItem'),8000).catch(()=>warnings.push('No cargaron los partidos de '+header.innerText.trim().slice(0,100)));
-    }
-    const events=(await readCompleteSportiumCatalogue(leagues)).flatMap(event=>{
+    const events=(await readCompleteSportiumCatalogue(leagues,warnings)).flatMap(event=>{
       try{return [{...event,start:sportiumStart(event.dateLabel),canonical_home:sportiumTeam(event.home,aliases),canonical_away:sportiumTeam(event.away,aliases)}];}catch{return [];}
     });
     return {ok:true,events,warnings,diagnostic:sportiumDiagnostic('catalogue')};

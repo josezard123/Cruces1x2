@@ -1,0 +1,26 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+let handler,clicked=0,observer;
+const row={innerText:'Croacia v España',children:[],getClientRects:()=>[{}],click(){clicked++;}};
+const document={querySelector:()=>null,documentElement:{},body:{innerText:'Buscar en bet365'},querySelectorAll:()=>[{getClientRects:()=>[{}],children:[]},row]};
+const target={canonical_home:'croacia',canonical_away:'espana',start:new Date(Date.now()+3600000).toISOString()};
+const payload={events:[{home:'Croatia',away:'Spain',start:target.start}]};
+const context={document,location:{href:'https://www.bet365.es/',hash:'#/AC/E123/'},Date,setTimeout,clearTimeout,setInterval(){},MutationObserver:class{constructor(fn){observer=this;this.fn=fn;}observe(){}disconnect(){this.disconnected=true;}},readBet365Result:()=>payload,chrome:{runtime:{sendMessage:async()=>({ok:true}),onMessage:{addListener(fn){handler=fn;}}},storage:{local:{get:async()=>({enabled:false})},onChanged:{addListener(){}}}}};
+vm.createContext(context);vm.runInContext(fs.readFileSync('bet365_extension/content.js','utf8'),context);
+(async()=>{
+ const scan=await new Promise(resolve=>handler({type:'scan-target',target,aliases:{}},{},resolve));
+ assert.equal(scan.ok,true);assert.equal(clicked,1);
+ row.innerText='Croacia\nV\nEspaña';const newline=await new Promise(resolve=>handler({type:'scan-target',target,aliases:{}},{},resolve));assert.equal(newline.ok,true);assert.equal(clicked,2);row.innerText='Croacia v España';assert.equal(observer.disconnected,true);
+ const read=await new Promise(resolve=>handler({type:'read-target',target,aliases:{croatia:'croacia',spain:'espana'}},{},resolve));
+ assert.equal(read.ok,true);assert.equal(read.payload,payload);
+ document.querySelectorAll=()=>[row,{...row,click(){throw new Error('ambiguous click');}}];
+ const ambiguous=await new Promise(resolve=>handler({type:'scan-target',target,aliases:{}},{},resolve));
+ assert.equal(ambiguous.ok,false);assert.equal(clicked,2);
+ const started={...target,start:new Date(Date.now()-1000).toISOString()};
+ assert.match((await context.scanTarget(started,{})).reason,/ya ha comenzado/);
+ assert.match((await context.readTarget(started,{})).reason,/ya ha comenzado/);assert.equal(clicked,2);
+ assert.match((await context.scanTarget({...target,readDeadline:Date.now()-1},{})).reason,/Límite de espera/);
+ assert.equal(context.normalizeTeam('Málaga C.F.',{'malaga c f':'malaga'}),'malaga');
+ console.log('Contenido: búsqueda sin clases CSS, nodos SVG, alias inglés, desconexión del observador y rechazo de encuentros duplicados verificados.');
+})().catch(error=>{console.error(error.message);process.exitCode=1;});

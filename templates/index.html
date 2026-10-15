@@ -18,7 +18,7 @@
 </head>
 <body><div class="wrap">
 <nav style="display:flex;gap:12px;margin-bottom:20px" aria-label="Apartados"><a class="btn primary" href="/" aria-current="page">Cruces 1-X-2</a><a class="btn secondary" href="/freebets">Freebets · Exchange</a></nav>
-<div class="hero"><div><h1>Cruces 1-X-2 <span style="font-size:14px;color:#a5b3d5">v4.4.2</span></h1><p>Compara <strong>Bet365 ES</strong>, <strong>Winamax ES</strong>, <strong>Betfair Sportsbook</strong>, <strong>Sportium ES</strong> y <strong>RETAbet ES</strong>. Las cinco casas se leen en Chrome o Edge con el lector instalado. Encuentra la mejor combinación con tres casas distintas.</p></div><span class="pill">Solo lectura · no realiza apuestas</span></div>
+<div class="hero"><div><h1>Cruces 1-X-2 <span style="font-size:14px;color:#a5b3d5">v4.4.3</span></h1><p>Compara <strong>Bet365 ES</strong>, <strong>Winamax ES</strong>, <strong>Betfair Sportsbook</strong>, <strong>Sportium ES</strong> y <strong>RETAbet ES</strong>. Las cinco casas se leen en Chrome o Edge con el lector instalado. Encuentra la mejor combinación con tres casas distintas.</p></div><span class="pill">Solo lectura · no realiza apuestas</span></div>
 
 <div class="panel">
 <form id="update-quotes" method="post" action="/update" data-web="0" data-direct="{{1 if cfg.odds_mode=='browser_direct' else 0}}">
@@ -181,8 +181,8 @@ fetch('/update-status',{cache:'no-store'}).then(r=>r.json()).then(p=>{if(p.runni
     document.addEventListener('cruces-reader-ready',handler);
   });
     if(!ready){status.textContent='Falta instalar el lector. Instálalo una sola vez y abre esta app en ese mismo Chrome o Edge. Abre Bet365 tú en una ventana normal del navegador antes de actualizar.';return;}
-    if(updateForm.dataset.direct==='1' && document.documentElement.dataset.crucesReaderVersion!=='2.1.2'){status.textContent='Recarga la extensión a la versión 2.1.2 y permite el acceso a las casas, incluido RETAbet.';return;}
-    if(!['1.8.0','1.9.0','1.9.1','2.1.2'].includes(document.documentElement.dataset.crucesReaderVersion)){status.textContent='Recarga la extensión a la versión 2.1.2 y después recarga esta pestaña. La búsqueda no se ha iniciado.';return;}
+    if(updateForm.dataset.direct==='1' && document.documentElement.dataset.crucesReaderVersion!=='2.1.3'){status.textContent='Recarga la extensión a la versión 2.1.3 y permite el acceso a las casas, incluido RETAbet.';return;}
+    if(!['1.8.0','1.9.0','1.9.1','2.1.3'].includes(document.documentElement.dataset.crucesReaderVersion)){status.textContent='Recarga la extensión a la versión 2.1.3 y después recarga esta pestaña. La búsqueda no se ha iniciado.';return;}
   status.textContent='Leyendo las casas seleccionadas. Espera a que termine…';
   let waitingForExisting=false;
   const progressTimer=setInterval(async()=>{

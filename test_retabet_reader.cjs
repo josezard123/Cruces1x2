@@ -25,6 +25,16 @@ bad(s=>s.date=['Mañana','21:00']);bad(s=>s.url=url+'?private=1');bad(s=>s.url=u
 assert.throws(()=>ctx.parseRetaEvent(snapshot,{...target,start:'invalid'},settings,now));
 assert.equal(ctx.parseRetaCatalogue([{...rows[0],live:'1'}],competition,settings,now).length,0);
 assert.equal(ctx.parseRetaCatalogue([{...rows[0],path:path.replace('champions-league','uefa-youth-league')}],competition,settings,now).length,0);
+const europa=ctx.retaCompetition('UEFA Europa League','/deportes/futbol/europa/uefa-europa-league/11');
+const europaRow={...rows[0],path:'/deportes/futbol/europa/uefa-europa-league-/stade-rennais-ofi-creta/38365925',teams:['Stade Rennais','OFI Creta']};
+const europaTargets=ctx.parseRetaCatalogue([europaRow],europa,{...settings,leagues:['uel']},now);
+assert.equal(europaTargets.length,1);assert.equal(europaTargets[0].event_id,'38365925');
+for(const replacement of ['uefa-conference-league-','uefa-europa-league-u19-','uefa-youth-league']){
+ assert.equal(ctx.parseRetaCatalogue([{...europaRow,path:europaRow.path.replace('uefa-europa-league-',replacement)}],europa,settings,now).length,0);
+}
+assert.equal(ctx.parseRetaCatalogue([{...europaRow,path:europaRow.path.replace('/europa/','/espana/')}],europa,settings,now).length,0);
+const europaSnapshot={...snapshot,url:europaTargets[0].url,home:'Stade Rennais',away:'OFI Creta',competitions:[{name:'UEFA Europa League',path:europa.url}]};
+assert.equal(ctx.parseRetaEvent(europaSnapshot,europaTargets[0],{...settings,leagues:['uel']},now).payout,'two_goals');
 assert.equal(ctx.retaCompetition('LaLiga','/deportes/futbol/guatemala/laliga/1'),null);
 assert.equal(ctx.retaCompetition('UEFA Youth League','/deportes/futbol/europa/uefa-youth-league/2617'),null);
 for(const change of [s=>s.markets.splice(0,1),s=>s.markets.push(structuredClone(s.markets[0])),s=>s.markets[0].selections[1].active=false,s=>s.markets[0].selections[1].name='1X']){

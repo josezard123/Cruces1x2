@@ -48,9 +48,12 @@ function retaDate(day,time,now=new Date()){
 }
 function parseRetaCatalogue(rows,competition,settings,now=new Date()){
  const events=new Map();
+ // RETAbet's Europa event slug ends in "league-", while its menu uses "league".
+ // Normalize only that final hyphen; sport, region and competition remain exact.
+ const scope=url=>{const parts=new URL(url).pathname.split('/').slice(0,5);parts[4]=parts[4].replace(/-+$/,'');return parts.join('/');};
  for(const row of rows){try{
   const url=retaURL(row.path,true);if(!url||row.live!=='0'||row.teams.length!==2)continue;
-  if(new URL(url).pathname.split('/').slice(0,5).join('/')!==new URL(competition.url).pathname.split('/').slice(0,5).join('/'))continue;
+  if(scope(url)!==scope(competition.url))continue;
   const start=retaDate(row.day,row.time,now);
   if(start<=now||start-now>settings.hours*3600000)continue;
   events.set(url,{url,event_id:new URL(url).pathname.split('/').pop(),home:row.teams[0],away:row.teams[1],start:start.toISOString(),competition});

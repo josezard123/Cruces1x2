@@ -36,8 +36,8 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
 async function waitFor(check,milliseconds=15000) {
   // DOM changes arrive even when Chrome throttles timers in inactive tabs.
   return new Promise((resolve,reject)=>{
-    let observer,timer;
-    const finish=(value,error)=>{observer?.disconnect();clearTimeout(timer);error?reject(error):resolve(value);};
+    let observer,timer,done=false;
+    const finish=(value,error)=>{if(done)return;done=true;observer?.disconnect();clearTimeout(timer);error?reject(error):resolve(value);};
     const inspect=()=>{
       try {const value=check();if(value)finish(value);}
       catch(error){finish(null,error);}
@@ -61,6 +61,12 @@ function matchesSearchHeader(text,target,aliases){
   teams=lines.length===2?lines:lines.length===3&&/^v(?:s\.?)?$/i.test(lines[1])?[lines[0],lines[2]]:[];
  }
  return teams.length===2&&normalizeTeam(teams[0],aliases)===target.canonical_home&&normalizeTeam(teams[1],aliases)===target.canonical_away;
+}
+function betTargetWait(target,maximum){
+  if(!Number.isFinite(Date.parse(target.start))||Date.parse(target.start)<=Date.now())throw Error('El partido ya ha comenzado; se omite la lectura prepartido.');
+  const remaining=(target.readDeadline||Date.now()+maximum)-Date.now();
+  if(remaining<=0)throw Error('Límite de espera de este partido alcanzado; se continúa con los demás.');
+  return Math.min(maximum,remaining);
 }
 function enhancedMarketControl(payload) {
   const main=document.querySelector('[role="main"]');
@@ -101,6 +107,7 @@ async function scanTarget(target,aliases) {
   if(scanning)return {ok:false,reason:'Ya hay una lectura en curso.'};
   scanning=true;
   try {
+    const maximum=betTargetWait(target,15000),searchHash=location.hash;
     if(document.body.innerText.match(/access denied|acceso denegado|verify you are human|verifica que eres humano/i))
       return {ok:false,blocked:true,reason:'La web bloqueó el acceso; lectura detenida.'};
     // Background navigates to the public search URL for this team.
@@ -109,7 +116,11 @@ async function scanTarget(target,aliases) {
       if(row.getClientRects().length===0)return false;
       return matchesSearchHeader(row.innerText,target,aliases);
     }).filter(row=>![...row.children].some(child=>child.innerText===row.innerText));
-    const rows=await waitFor(()=>{const found=find();return found.length?found:null;},30000);
+    const rows=await waitFor(()=>{
+      betTargetWait(target,15000);
+      if(location.hash!==searchHash)throw Error('La búsqueda ha cambiado; no se selecciona un resultado anterior.');
+      const found=find();return found.length?found:null;
+    },maximum);
     if(rows.length!==1)return {ok:false,reason:'La búsqueda no identifica un único partido.',diagnostic:bet365Diagnostic('search',target,aliases)};
     rows[0].click();
     return {ok:true,navigated:true};
@@ -122,20 +133,23 @@ async function readTarget(target,aliases) {
   scanning=true;
   let lastError='No apareció Resultado final para este encuentro.';
   try {
+    const maximum=betTargetWait(target,30000);
     const payload=await waitFor(()=>{
+      betTargetWait(target,30000);
       try {
         if(!/\/E\d+\//.test(location.hash||''))return null;
         const candidate=readBet365Result();
         if(normalizeTeam(candidate.events[0].home,aliases)!==target.canonical_home || normalizeTeam(candidate.events[0].away,aliases)!==target.canonical_away){lastError='Los equipos mostrados por Bet365 no coinciden con la referencia.';return null;}
         return candidate;
       } catch(error){lastError=error.message;return null;}
-    },30000);
+    },maximum);
     if(Math.abs(new Date(payload.events[0].start)-new Date(target.start))>900000)return {ok:false,reason:'Hora distinta; partido excluido.'};
-    return {ok:true,payload:await readWithEnhanced(payload)};
-  } catch(_){
+    return {ok:true,payload:await readWithEnhanced(payload,betTargetWait(target,6000))};
+  } catch(error){
     const blocked=/access denied|acceso denegado|verify you are human|verifica que eres humano/i.test(document.body.innerText);
     const diagnostic=bet365Diagnostic('event',target,aliases);
     if(blocked)return {ok:false,blocked:true,reason:'Bet365 bloqueó el acceso; lectura detenida.'};
+    if(/ya ha comenzado|Límite de espera/.test(error.message))return {ok:false,reason:error.message,diagnostic};
     if(diagnostic?.counts.market_nodes===0&&diagnostic?.counts.home_nodes===0&&diagnostic?.counts.away_nodes===0)lastError='Bet365 no cargó la cabecera ni Resultado final del partido.';
     return {ok:false,reason:lastError,diagnostic};
   }

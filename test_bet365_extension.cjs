@@ -4,7 +4,7 @@ const vm=require('node:vm');
 let listener;
 const calls=[];
 let tabUrl='';let firstRead=true;let selectedTarget=null;let cancelAfterRead=false;
-const target={home:'Croacia',away:'España',canonical_home:'croacia',canonical_away:'espana',start:'2026-10-06T18:45:00Z'};
+const target={home:'Croacia',away:'España',canonical_home:'croacia',canonical_away:'espana',start:new Date(Date.now()+3600000).toISOString()};
 const payload={source_url:'https://www.bet365.es/#/AC/B1/C1/D8/E201151094/',events:[{home:'Croacia',away:'España',odds:{'1':8.5,'X':6.25,'2':1.27},enhanced_odds:{'1':8.75,'X':6.5,'2':1.3}}]};
 let sportRecords=[{...target,event_id:'19514722',source_url:'https://www.sportium.es/apuestas/sports/soccer/events/19514722'}];
 const chrome={

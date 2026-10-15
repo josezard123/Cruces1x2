@@ -2,7 +2,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 process.env.TZ='Europe/Madrid';
 const ctx={Date,Intl,setInterval(){},document:{body:{innerText:'Full Time Result'}},location:{hash:'/AC/B1/C1/D8/E201058118/F3/G40/'},chrome:{storage:{local:{get:async()=>({})},onChanged:{addListener(){}}},runtime:{onMessage:{addListener(){}}}}};
 vm.createContext(ctx);vm.runInContext(fs.readFileSync('bet365_extension/content.js','utf8'),ctx);
-const target={canonical_home:'shakhtar donetsk',canonical_away:'aek atenas',start:'2026-10-14T19:00:00Z'};
+const target={canonical_home:'shakhtar donetsk',canonical_away:'aek atenas',start:new Date(Date.now()+3600000).toISOString()};
 const payload={events:[{home:'Shakhtar Donetsk',away:'AEK Athens',start:target.start}]};
 let reads=0;
 ctx.readBet365Result=()=>{if(++reads===1)throw Error('Se necesita la fecha de un partido prepartido.');return payload;};
