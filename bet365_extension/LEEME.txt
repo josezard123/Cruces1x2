@@ -1,4 +1,4 @@
-LECTOR DE CUOTAS ES - CHROME / EDGE, versión 2.1.3
+LECTOR DE CUOTAS ES - CHROME / EDGE, versión 2.1.4
 
 Lee Bet365, Winamax ES, Betfair Sportsbook, Sportium ES, RETAbet ES y Betfair Exchange mediante el navegador.
 Instalación: abre chrome://extensions o edge://extensions, activa Modo desarrollador y carga descomprimida esta carpeta. Activa lectura en el icono Cruces.
@@ -15,5 +15,5 @@ Freebets reutiliza las cuotas de la casa elegida. Actualizar Exchange y ordenar 
 Las cuotas se conservan durante 1 hora. Comprueba los precios actuales en la casa antes de usarlos.
 Solo envía a la app local equipos, competición, fechas, cuotas y liquidez públicas. No lee cookies, contraseñas ni información de cuenta y no realiza apuestas. No resuelve captchas ni reintenta accesos bloqueados.
 
-Bet365: abre la casa tú e inicia sesión en una ventana normal del mismo Chrome o Edge. Si no está abierta, verás una advertencia y se continuará con las otras casas. Puedes guardar usuario y contraseña en el gestor de contraseñas del navegador. El lector comparte esa sesión sin leer cookies ni contraseñas; no inicia sesión ni crea cuentas.
+Bet365: abre la casa tú en una ventana normal del mismo Chrome o Edge. Se leen las normales y se añaden las mejoradas solo si sus precios están disponibles. Si no hay mejoradas, se continúa con las normales sin pedir que te identifiques. Si la casa no está abierta, se avisa y se continúa con las otras casas. No se leen cookies o contraseñas ni se crean cuentas.
 RETAbet: se guardan el 1-X-2 normal y Ventaja 2 goles por separado. X puede usar el normal; 1/2 mantienen Ventaja 2 goles. Freebets compara ambos mercados.

@@ -61,6 +61,13 @@ vm.runInContext(fs.readFileSync('bet365_extension/background.js','utf8'),context
   sportRecords=[{...sportRecords[0],source_url:'https://evil.example/events/1'}];
   const unsafe=await new Promise(resolve=>listener({type:'automatic-bet365-scan',filter:{sources:['sportium'],home:'Croacia',away:'España'}},{url:'http://127.0.0.1:8802/'},resolve));
   assert.equal(unsafe.captured,0);
+  const savedEnhanced=payload.events[0].enhanced_odds;delete payload.events[0].enhanced_odds;calls.length=0;
+  const normalOnly=await new Promise(resolve=>listener({type:'automatic-bet365-scan',filter:{home:'Croacia',away:'España',sources:['bet365']}},{url:'http://127.0.0.1:8802/'},resolve));
+  assert.equal(normalOnly.captured,1);assert.equal(normalOnly.failures.length,0);
+  const normalPost=calls.find(c=>c[0]==='fetch'&&c[1].endsWith('/bet365-scan-observation'));
+  assert.deepEqual(JSON.parse(normalPost[2].body).events[0].odds,payload.events[0].odds);
+  assert.equal(JSON.parse(normalPost[2].body).events[0].enhanced_odds,undefined);
+  payload.events[0].enhanced_odds=savedEnhanced;
   calls.length=0;cancelAfterRead=true;
   const stopped=await new Promise(resolve=>listener({type:'automatic-bet365-scan',filter:{home:'Croacia',away:'España',sources:['bet365','sportium']}},{url:'http://127.0.0.1:8802/'},resolve));
   assert.equal(stopped.reason,'cancelled');
