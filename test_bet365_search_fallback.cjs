@@ -6,9 +6,9 @@ vm.createContext(ctx);ctx.importScripts=(...names)=>names.forEach(name=>vm.runIn
 ctx.waitForReader=async(id,expected)=>{if(expected&&!expected.includes('Borussia'))throw Error('home route not ready');};
 (async()=>{
  const result=await ctx.scanAutomatically('http://127.0.0.1:8802',{},'bet365');
- assert.equal(result.captured,1);assert.equal(imports,1);assert(urls.some(url=>url.includes('K%5EBorussia%20Dortmund/')));
+ assert.equal(result.captured,1);assert.equal(imports,1);assert.equal(urls.length,2);assert(urls[0].includes('K%5EBod'));assert(urls[1].includes('K%5EBorussia%20Dortmund/'));
  urls.length=0;blocked=true;ctx.waitForReader=async()=>{};
  const denied=await ctx.scanAutomatically('http://127.0.0.1:8802',{},'bet365');
  assert.equal(denied.captured,0);assert.equal(urls.length,1);assert.equal(imports,1);
- console.log('Bet365: búsqueda por rival tras fallar las dos rutas del local; un bloqueo detiene los reintentos y no importa cuotas.');
+ console.log('Bet365: búsqueda por visitante como segundo intento, antes de otra variante del local; un bloqueo detiene los reintentos y no importa cuotas.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

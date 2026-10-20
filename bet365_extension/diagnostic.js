@@ -75,5 +75,5 @@ function publicReaderDiagnostic(source,phase,target={},aliases={}) {
    if(id&&lines.every(Boolean)&&cards.length<40)cards.push({id,lines});
   }
  }
- return {schema:1,reader_version:'2.1.4',source,phase,target:{home:diagnosticText(target.home,120)||'',away:diagnosticText(target.away,120)||''},event_id:source==='bet365'?(/\/E(\d+)\//.exec(location.hash||'')?.[1]||''):'',counts,nodes,competitions,rows,cards};
+ return {schema:1,reader_version:'2.1.5',source,phase,target:{home:diagnosticText(target.home,120)||'',away:diagnosticText(target.away,120)||''},event_id:source==='bet365'?(/\/E(\d+)\//.exec(location.hash||'')?.[1]||''):'',counts,nodes,competitions,rows,cards};
 }

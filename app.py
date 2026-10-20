@@ -143,6 +143,12 @@ TEAM_ALIASES = {
     "oporto": "porto", "b munich": "bayern munchen", "leipzig": "rb leipzig",
     "stuttgart": "vfb stuttgart", "aek": "aek atenas", "aek de atenas": "aek atenas", "aek athens": "aek atenas",
     "shakhtar": "shakhtar donetsk",
+    # Club spellings observed in the Spanish Champions League catalogues.
+    "psv": "psv eindhoven", "napoli": "napoles", "galatasaray sk": "galatasaray", "viking fk": "viking",
+    "inter de milan": "inter", "sporting": "sporting portugal", "sporting lisboa": "sporting portugal", "sporting cp": "sporting portugal",
+    "slavia prague": "slavia praga", "sk slavia praha": "slavia praga", "sk slavia praga": "slavia praga",
+    "at madrid": "atletico de madrid", "man united": "manchester united", "lille osc": "lille",
+    "bayern m": "bayern munchen", "rc lens": "lens",
     # Club spellings observed in the Spanish Europa League catalogues.
     "sk sturm graz": "sturm graz", "ferencvarosi tc": "ferencvaros", "ferencvarosi": "ferencvaros",
     "viktoria pilsen": "viktoria plzen", "stade rennais": "rennes", "stade rennes": "rennes",

@@ -78,7 +78,7 @@ async function scanAutomatically(origin,filter={},source='bet365',continuing=fal
     if(sportium&&tab){
       await progress('Leyendo el catálogo público de Sportium (48 horas)');
       await waitForReader(tab.id);
-      const task={type:'sportium-catalogue',aliases:data.aliases,leagues:data.leagues||[]};
+      const task={type:'sportium-catalogue',aliases:data.aliases,leagues:data.leagues||[],targets:data.targets};
       let listed=await readerTask(tab.id,task);
       await savePublicDiagnostic(origin,listed);
       listed=await retryEmptyPublicPage(tab,listed,()=>readerTask(tab.id,task),cancelled,progress);
@@ -108,25 +108,23 @@ async function scanAutomatically(origin,filter={},source='bet365',continuing=fal
             selected={ok:true,verifiedStart:found[0].start,expectedEventId:found[0].event_id};
           }
         }else {
-          selected=await searchBetTeam(tab.id,target.home,target,data.aliases);
-          await savePublicDiagnostic(origin,selected);
-          selected=await retryEmptyPublicPage(tab,selected,()=>selectBetTarget(tab.id,target,data.aliases),cancelled,progress);
-          await savePublicDiagnostic(origin,selected);
+          // Search the visitor immediately after the home team. A spelling
+          // variant of the home team is only a third attempt, with shared time.
+          const queries=[target.home,target.away];
           const original=target.home.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').trim();
-          if(!selected?.ok&&!selected?.blocked&&target.canonical_home!==original&&!(await cancelled())){
+          if(target.canonical_home!==original)queries.push(target.canonical_home);
+          for(const team of [...new Set(queries)]){
+            if(await cancelled())break;
             requireUpcomingTarget(target);
-            // One fallback for known name variants; the teams and date still need verification.
-            selected=await searchBetTeam(tab.id,target.canonical_home,target,data.aliases);
-            selected=await retryEmptyPublicPage(tab,selected,()=>selectBetTarget(tab.id,target,data.aliases),cancelled,progress);
+            // Reserve time for the visitor and for reading the selected event.
+            const searchTarget={...target,readDeadline:Math.min(target.readDeadline,Date.now()+25000)};
+            selected=await searchBetTeam(tab.id,team,searchTarget,data.aliases);
             await savePublicDiagnostic(origin,selected);
-          }
-          if(!selected?.ok&&!selected?.blocked&&!(await cancelled())){
-            requireUpcomingTarget(target);
-            // One final search by the opponent avoids depending on a home
-            // spelling with accents or a slash. Both teams are still verified.
-            selected=await searchBetTeam(tab.id,target.away,target,data.aliases);
-            selected=await retryEmptyPublicPage(tab,selected,()=>selectBetTarget(tab.id,target,data.aliases),cancelled,progress);
-            await savePublicDiagnostic(origin,selected);
+            if(Date.now()<searchTarget.readDeadline){
+              selected=await retryEmptyPublicPage(tab,selected,()=>selectBetTarget(tab.id,searchTarget,data.aliases),cancelled,progress);
+              await savePublicDiagnostic(origin,selected);
+            }
+            if(selected?.ok||selected?.blocked)break;
           }
         }
         if(!selected?.ok) {

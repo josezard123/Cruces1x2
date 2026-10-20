@@ -96,49 +96,61 @@ function sportiumListSignature() {
   return [...document.querySelectorAll('.ta-EventListGroup .ta-GroupHeader')].map(n=>n.innerText.trim()).join('|')+'::'+
     [...document.querySelectorAll('.ta-EventListGroup .ta-EventListItem a.ta-EventListItemDetails')].map(n=>n.getAttribute('href')).join('|');
 }
-async function readCompleteSportiumCatalogue(leagues=[],warnings=[]) {
-  const collected=new Map(),collect=()=>{for(const event of readSportiumCatalogue(leagues))collected.set(event.source_url,event);};
-  const expanded=new Set();
+async function readCompleteSportiumCatalogue(leagues=[],warnings=[],targets=[],aliases={}) {
+  const deadline=Date.now()+55000,collected=new Map(),expanded=new Set();
+  const collect=()=>{for(const event of readSportiumCatalogue(leagues))collected.set(event.source_url,event);};
+  const covered=()=>targets.length>0&&targets.every(target=>[...collected.values()].filter(event=>{
+    try{return sportiumTeam(event.home,aliases)===target.canonical_home&&sportiumTeam(event.away,aliases)===target.canonical_away&&Math.abs(Date.parse(sportiumStart(event.dateLabel))-Date.parse(target.start))<=900000;}catch(_){return false;}
+  }).length===1);
   const collectGroups=async()=>{
-    // Virtual lists mount new headers while scrolling. Expand each selected
-    // competition once, including those absent from the first viewport.
     for(const group of document.querySelectorAll('.ta-EventListGroup')){
+      if(Date.now()>=deadline)break;
       const header=group.querySelector('.ta-GroupHeader'),label=header?.innerText.trim();
       if(!header||!sportiumAllowedGroup(label,leagues)||group.querySelector('.ta-EventListItem')||expanded.has(label))continue;
       expanded.add(label);header.click();
-      try{await sportiumWait(()=>group.querySelector('.ta-EventListItem'),8000);}
+      try{await sportiumWait(()=>group.querySelector('.ta-EventListItem'),Math.max(1,Math.min(8000,deadline-Date.now())));}
       catch(error){if(/bloqueó/.test(error.message))throw error;warnings.push('No cargaron los partidos de '+label.slice(0,100));}
     }
     collect();
   };
-  await collectGroups();
-  const anchor=document.querySelector('.ta-EventListGroups');let scroller=null;
-  for(let node=anchor;node;node=node.parentElement){
-    if(node.clientHeight>0&&node.scrollHeight>node.clientHeight+2&&/auto|scroll/.test(getComputedStyle(node).overflowY)){scroller=node;break;}
-  }
-  if(!scroller)return [...collected.values()];
-  const move=async position=>{
-    const before=sportiumListSignature();scroller.scrollTop=position;
-    try{await sportiumWait(()=>sportiumListSignature()!==before,1000);}catch(error){if(/bloqueó/.test(error.message))throw error;}
-    await collectGroups();
-  };
-  if(scroller.scrollTop>0)await move(0);
-  for(let page=0;page<20&&scroller.scrollTop+scroller.clientHeight<scroller.scrollHeight-2;page++){
-    const before=scroller.scrollTop;await move(before+Math.max(200,scroller.clientHeight-100));
-    if(scroller.scrollTop===before)break;
+  // Some layouts scroll the whole document (overflow: visible), while others
+  // virtualize a nested pane. Retain every page and allow a late second batch.
+  for(let pass=0;pass<(targets.length?2:1)&&Date.now()<deadline;pass++){
+    await collectGroups();if(covered())break;
+    const anchor=document.querySelector('.ta-EventListGroups');let scroller=null;
+    for(let node=anchor;node;node=node.parentElement){
+      if(node.clientHeight>0&&node.scrollHeight>node.clientHeight+2&&/auto|scroll/.test(getComputedStyle(node).overflowY)){scroller=node;break;}
+    }
+    const pageScroller=document.scrollingElement||document.documentElement;
+    if(!scroller&&pageScroller?.clientHeight>0&&pageScroller.scrollHeight>pageScroller.clientHeight+2)scroller=pageScroller;
+    if(scroller){
+      const move=async position=>{
+        const before=sportiumListSignature();scroller.scrollTop=position;
+        try{await sportiumWait(()=>sportiumListSignature()!==before,Math.max(1,Math.min(1000,deadline-Date.now())));}catch(error){if(/bloqueó/.test(error.message))throw error;}
+        await collectGroups();
+      };
+      if(scroller.scrollTop>0)await move(0);
+      for(let page=0;page<20&&Date.now()<deadline&&!covered()&&scroller.scrollTop+scroller.clientHeight<scroller.scrollHeight-2;page++){
+        const before=scroller.scrollTop;await move(before+Math.max(200,scroller.clientHeight-100));
+        if(scroller.scrollTop===before)break;
+      }
+    }
+    if(covered()||pass>0||!targets.length)break;
+    const before=sportiumListSignature();
+    try{await sportiumWait(()=>sportiumListSignature()!==before,Math.max(1,Math.min(3000,deadline-Date.now())));}catch(error){if(/bloqueó/.test(error.message))throw error;}
   }
   return [...collected.values()];
 }
 function sportiumDiagnostic(phase) {
   try{return typeof publicReaderDiagnostic==='function'?publicReaderDiagnostic('sportium',phase):undefined;}catch(_){return undefined;}
 }
-async function sportiumCatalogue(aliases,leagues=[]) {
+async function sportiumCatalogue(aliases,leagues=[],targets=[]) {
   try {
     if(Intl.DateTimeFormat().resolvedOptions().timeZone!=='Europe/Madrid')throw new Error('Usa la zona horaria Europe/Madrid.');
     if(/access denied|acceso denegado|verify you are human|verifica que eres humano/i.test(document.body.innerText))return {ok:false,blocked:true,reason:'Sportium bloqueó el acceso; lectura detenida.'};
     await sportiumWait(()=>document.querySelector('.ta-EventListGroups .ta-GroupHeader'));
     const warnings=[];
-    const events=(await readCompleteSportiumCatalogue(leagues,warnings)).flatMap(event=>{
+    const events=(await readCompleteSportiumCatalogue(leagues,warnings,targets,aliases)).flatMap(event=>{
       try{return [{...event,start:sportiumStart(event.dateLabel),canonical_home:sportiumTeam(event.home,aliases),canonical_away:sportiumTeam(event.away,aliases)}];}catch{return [];}
     });
     return {ok:true,events,warnings,diagnostic:sportiumDiagnostic('catalogue')};
@@ -162,7 +174,7 @@ async function sportiumRead(target,aliases){
 }
 chrome.runtime.onMessage.addListener((message,sender,respond)=>{
   if(message.type==='reader-ping'){respond({ok:true,url:location.href});return false;}
-  if(message.type==='sportium-catalogue'){sportiumCatalogue(message.aliases||{},Array.isArray(message.leagues)?message.leagues:[]).then(respond);return true;}
+  if(message.type==='sportium-catalogue'){sportiumCatalogue(message.aliases||{},Array.isArray(message.leagues)?message.leagues:[],Array.isArray(message.targets)?message.targets:[]).then(respond);return true;}
   if(message.type==='read-target'){sportiumRead(message.target,message.aliases).then(respond);return true;}
   return false;
 });

@@ -119,6 +119,23 @@ class AppTests(unittest.TestCase):
                 b.league='UEFA Conference League'
                 self.assertNotIn('sportium',a.group_quotes({'winamax_es':[w],'sportium':[b]}, {'uel'},24)[0].quotes)
 
+    def test_champions_names_merge_without_other_leagues_or_youth(self):
+        pairs=[('PSV Eindhoven','PSV'),('Nápoles','Napoli'),('Galatasaray','Galatasaray SK'),('Viking','Viking FK'),
+               ('Inter Milán','Inter de Milán'),('Sporting Portugal','Sporting'),('Sporting Portugal','Sporting Lisboa'),
+               ('Sporting Portugal','Sporting CP'),('Slavia Praga','SK Slavia Praha'),('Slavia Praga','SK Slavia Praga'),
+               ('Slavia Praga','Slavia Prague'),('Atlético Madrid','At. Madrid'),('Manchester United','Man. United'),
+               ('Lille','Lille OSC'),('Bayern Múnich','Bayern M.'),('Lens','RC Lens')]
+        for reference,observed in pairs:
+            with self.subTest(reference=reference,observed=observed):
+                self.assertEqual(a.canonical_team(reference),a.canonical_team(observed))
+                self.assertNotEqual(a.canonical_team(reference),a.canonical_team(observed+' U19'))
+                w=q('winamax_es',reference,'Test Rival','Champions League','Europa')
+                b=q('sportium',observed,'Test Rival','UEFA Champions League','Europa');b.start=w.start
+                groups=a.group_quotes({'winamax_es':[w],'sportium':[b]},{'ucl'},24)
+                self.assertEqual(len(groups),1);self.assertEqual(set(groups[0].quotes),{'winamax_es','sportium'})
+                b.league='UEFA Europa League'
+                self.assertNotIn('sportium',a.group_quotes({'winamax_es':[w],'sportium':[b]},{'ucl'},24)[0].quotes)
+
     def test_bet365_bare_spanish_league_needs_unique_reference(self):
         a.write_config({'selected_leagues':['laliga'],'bet365_mode':'browser_auto'})
         ref=q('winamax_es','Valencia','Levante','LaLiga','Spain')
