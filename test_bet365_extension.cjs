@@ -63,7 +63,8 @@ vm.runInContext(fs.readFileSync('bet365_extension/background.js','utf8'),context
   assert.equal(unsafe.captured,0);
   const savedEnhanced=payload.events[0].enhanced_odds;delete payload.events[0].enhanced_odds;calls.length=0;
   const normalOnly=await new Promise(resolve=>listener({type:'automatic-bet365-scan',filter:{home:'Croacia',away:'España',sources:['bet365']}},{url:'http://127.0.0.1:8802/'},resolve));
-  assert.equal(normalOnly.captured,1);assert.equal(normalOnly.failures.length,0);
+  assert.equal(normalOnly.captured,1);assert.equal(normalOnly.failures.length,1);assert.match(normalOnly.failures[0],/Cuotas mejoradas no disponibles/);
+  assert.doesNotMatch(normalOnly.failures[0],/Abre|inici.*sesi/i);
   const normalPost=calls.find(c=>c[0]==='fetch'&&c[1].endsWith('/bet365-scan-observation'));
   assert.deepEqual(JSON.parse(normalPost[2].body).events[0].odds,payload.events[0].odds);
   assert.equal(JSON.parse(normalPost[2].body).events[0].enhanced_odds,undefined);
@@ -76,7 +77,7 @@ vm.runInContext(fs.readFileSync('bet365_extension/background.js','utf8'),context
   assert(calls.some(c=>c[0]==='remove'));
   calls.length=0;cancelAfterRead=false;sportRecords=[{...target,event_id:'19514722',source_url:'https://www.sportium.es/apuestas/sports/soccer/events/19514722'}];chrome.tabs.query=async()=>[];
   const withoutBet=await new Promise(resolve=>listener({type:'automatic-bet365-scan',filter:{home:'Croacia',away:'España',sources:['bet365','sportium']}},{url:'http://127.0.0.1:8802/'},resolve));
-  assert(withoutBet.ok);assert.equal(withoutBet.captured,1);assert.match(withoutBet.failures[0],/Abre Bet365.*otras casas/);
-  assert.equal(calls.filter(c=>c[0]==='create').length,1);assert(calls.find(c=>c[0]==='create')[1].url.includes('sportium.es'));
+  assert(withoutBet.ok);assert.equal(withoutBet.captured,2);assert.equal(withoutBet.failures.length,0);
+  assert.equal(calls.filter(c=>c[0]==='create').length,2);assert(calls.find(c=>c[0]==='create')[1].url.includes('bet365.es'));
   console.log('Extensión: origen local verificado, búsqueda en pestaña propia, entrega pública y cierre comprobados con navegador simulado.');
 })().catch(error=>{console.error(error.message);process.exitCode=1;});

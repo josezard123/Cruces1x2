@@ -1,0 +1,14 @@
+{% macro cross_calculator(c, prefix, match, meta='', primary=false) -%}
+<div class="cross-calculator" data-cross-calculator role="group" aria-label="Calculadora del cruce {{match}}">
+{% if primary %}<div class="cardhead"><div><div class="match">{{match}}</div><div class="meta">{{meta}}</div></div><div class="loss {{'good' if c.worst_profit>=0 else 'bad'}}" data-calc-value="worst_profit">{{'%+.2f'|format(c.worst_profit)}} €</div></div>{% endif %}
+<div class="scroll"><table class="cross-table"><thead><tr><th>Signo</th><th>Casa</th><th class="num">Cuota</th><th class="num">Apostar (€)</th><th class="num">Cobro</th><th class="num">Beneficio / pérdida</th></tr></thead><tbody>
+{% for sign in ['1','X','2'] %}<tr><td><span class="tag">{{sign}}</span></td><td>{{c['book'~sign]}}{% if c['market'~sign] %}<span class="srcmeta">{{c['market'~sign]}}</span>{% endif %}{% if c['url'~sign] %}<a class="open" href="{{c['url'~sign]}}" target="_blank" rel="noopener">↗ abrir</a>{% endif %}</td>
+<td class="num"><input class="cross-number" id="{{prefix}}-q{{sign}}" data-calc-field="q{{sign}}" aria-label="Cuota {{sign}}, {{c['book'~sign]}}" inputmode="decimal" autocomplete="off" value="{{c['q'~sign]}}"></td>
+<td class="num"><input class="cross-number" id="{{prefix}}-stake{{sign}}" data-calc-field="stake{{sign}}" aria-label="Apuesta {{sign}} en euros, {{c['book'~sign]}}" inputmode="decimal" autocomplete="off" value="{{'%.2f'|format(c['stake'~sign])}}" {% if sign!='1' %}disabled{% endif %}></td>
+<td class="num"><span data-calc-value="return{{sign}}">{{'%.2f'|format(c['return'~sign])}} €</span></td><td class="num"><span class="{{'good' if c['return'~sign]-c.total>=0 else 'bad'}}" data-calc-value="profit{{sign}}">{{'%+.2f'|format(c['return'~sign]-c.total)}} €</span></td></tr>{% endfor %}
+</tbody></table></div>
+<div class="summary" aria-live="polite"><span>Total: <strong data-calc-value="total">{{'%.2f'|format(c.total)}} €</strong></span><span>Cobro mínimo: <strong data-calc-value="min_return">{{'%.2f'|format(c.min_return)}} €</strong></span><span>Peor caso: <strong class="{{'good' if c.worst_profit>=0 else 'bad'}}" data-calc-value="worst_profit">{{'%+.2f'|format(c.worst_profit)}} €</strong></span></div>
+<div class="cross-tools"><label class="check"><input type="checkbox" data-calc-manual> Ajustar los tres importes</label><button class="btn secondary cross-reset" type="button" data-calc-reset>Restablecer</button></div>
+<p class="small cross-status" data-calc-status role="status" aria-live="polite">Edita las cuotas o la apuesta al 1; X y 2 se recalculan aquí.</p>
+</div>
+{%- endmacro %}

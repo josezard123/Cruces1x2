@@ -24,13 +24,8 @@
       results.hidden=false;save();
     }catch{if(current===sequence){results.hidden=true;status.textContent='No se pudo conectar con la calculadora local.';}}
   }
-  const changed=()=>{editingSettings=true;sequence++;clearTimeout(timer);timer=setTimeout(calculate,180);};
+  const changed=()=>{document.dispatchEvent(new CustomEvent('cruces-calculator-edit'));sequence++;clearTimeout(timer);timer=setTimeout(calculate,180);};
   Object.values(inputs).forEach(input=>input.addEventListener('input',changed));mode.addEventListener('change',()=>{sync();changed();});
-  document.querySelectorAll('.use-calculator').forEach(button=>button.addEventListener('click',()=>{
-    inputs.q1.value=button.dataset.q1;inputs.qX.value=button.dataset.qx;inputs.q2.value=button.dataset.q2;inputs.stake1.value=button.dataset.stake;
-    mode.checked=false;document.getElementById('calculator-match').textContent=button.dataset.match;
-    document.getElementById('manual-calculator').scrollIntoView({behavior:'smooth',block:'start'});changed();
-  }));
-  try{const stored=JSON.parse(sessionStorage.getItem('cruces.manualCalculator')||'null');if(stored){ids.forEach(k=>{if(typeof stored[k]==='string')inputs[k].value=stored[k];});mode.checked=stored.manual_stakes===true;editingSettings=true;calculate();}}catch{}
+  try{const stored=JSON.parse(sessionStorage.getItem('cruces.manualCalculator')||'null');if(stored){ids.forEach(k=>{if(typeof stored[k]==='string')inputs[k].value=stored[k];});mode.checked=stored.manual_stakes===true;document.dispatchEvent(new CustomEvent('cruces-calculator-edit'));calculate();}}catch{}
   sync();
 })();

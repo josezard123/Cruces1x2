@@ -1,3 +1,4 @@
+{% from 'cross_calculator.html' import cross_calculator %}
 <!doctype html>
 <html lang="es" data-cruces-installed="{{ 1 if distribution_installed else 0 }}">
 <head>
@@ -12,13 +13,14 @@
 .section-title{margin:0 0 7px;font-size:23px}.subtle{color:var(--muted);line-height:1.5}.scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;margin-top:13px}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line)}th{font-size:12px;color:var(--muted)}td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}.odds{font-variant-numeric:tabular-nums;white-space:nowrap}.yes{color:var(--good);font-weight:700}.no{color:var(--bad)}.srcmeta{display:block;font-size:11px;color:var(--muted);margin-top:3px}.open{font-size:11px;color:#9bc0ff;text-decoration:none;margin-left:5px}.open:hover{text-decoration:underline}
 .cardhead{display:flex;justify-content:space-between;gap:15px}.match{font-size:21px;font-weight:800}.meta{color:var(--muted);font-size:13px;margin-top:4px}.loss{font-size:22px;font-weight:850}.good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}.tag{font-size:12px;border:1px solid var(--line);border-radius:8px;padding:4px 7px}.summary{display:flex;gap:18px;flex-wrap:wrap;margin-top:13px;color:var(--muted)}.summary strong{color:var(--text)}details{margin-top:12px;color:var(--muted)}.empty{text-align:center;color:var(--muted);padding:25px}.note{font-size:12px;color:var(--muted)}
 .info{border-left:4px solid var(--accent);padding-left:14px}.warningbox{border-left:4px solid var(--warn);padding-left:14px}.small{font-size:12px;color:var(--muted)}.calculator-fields{display:grid;grid-template-columns:repeat(3,minmax(130px,1fr));gap:12px;margin-top:16px}.calculator-fields input:disabled{opacity:.65}@media(max-width:600px){.calculator-fields{grid-template-columns:1fr}}
+.cross-number{width:100px;max-width:100%;padding:9px 8px;border:1px solid var(--line);border-radius:8px;background:#0d1425;color:var(--text);text-align:right;font:inherit;font-variant-numeric:tabular-nums}.cross-number:focus{outline:2px solid var(--accent);outline-offset:1px}.cross-number:disabled{color:var(--muted);background:transparent;border-color:transparent}.cross-table{min-width:650px}.cross-tools{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:14px}.cross-tools .check{font-size:12px}.cross-reset{font-size:12px;padding:7px 10px}.cross-status{margin:10px 0 0;line-height:1.5}.alternative-panel>td{padding:14px;background:var(--chip)}.alternative-panel .cross-calculator{min-width:650px}.cross-calculator[aria-busy="true"] [data-calc-value]{opacity:.5}[hidden]{display:none!important}
 @media(max-width:1000px){.settings{grid-template-columns:1fr 1fr}.api,.save{grid-column:1/-1}.sourcegrid{grid-template-columns:1fr}.hero h1{font-size:34px}}
 </style>
 <style>.settings{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:650px){.settings{grid-template-columns:1fr}}</style>
 </head>
 <body><div class="wrap">
 <nav style="display:flex;gap:12px;margin-bottom:20px" aria-label="Apartados"><a class="btn primary" href="/" aria-current="page">Cruces 1-X-2</a><a class="btn secondary" href="/freebets">Freebets · Exchange</a></nav>
-<div class="hero"><div><h1>Cruces 1-X-2 <span style="font-size:14px;color:#a5b3d5">v4.4.6</span></h1><p>Compara <strong>Bet365 ES</strong>, <strong>Winamax ES</strong>, <strong>Betfair Sportsbook</strong>, <strong>Sportium ES</strong> y <strong>RETAbet ES</strong>. Las cinco casas se leen en Chrome o Edge con el lector instalado. Encuentra la mejor combinación con tres casas distintas.</p></div><span class="pill">Solo lectura · no realiza apuestas</span></div>
+<div class="hero"><div><h1>Cruces 1-X-2 <span style="font-size:14px;color:#a5b3d5">v4.4.7</span></h1><p>Compara <strong>Bet365 ES</strong>, <strong>Winamax ES</strong>, <strong>Betfair Sportsbook</strong>, <strong>Sportium ES</strong> y <strong>RETAbet ES</strong>. Las cinco casas se leen en Chrome o Edge con el lector instalado. Encuentra la mejor combinación con tres casas distintas.</p></div><span class="pill">Solo lectura · no realiza apuestas</span></div>
 
 <div class="panel">
 <form id="update-quotes" method="post" action="/update" data-web="0" data-direct="{{1 if cfg.odds_mode=='browser_direct' else 0}}">
@@ -46,21 +48,17 @@
 {% endif %}
 </div>
 
-<details class="small" style="margin-top:16px"><summary>Sobre las cuotas</summary><p>1 y 2: mercados de 2 goles de ventaja. X: normal de RETAbet o mejorada de Bet365 cuando ofrecen mejor precio. Abre Bet365 tú en una ventana normal del mismo navegador. Sus mejoradas son opcionales: si no están disponibles, se mantienen las cuotas normales. Si no está abierto, verás una advertencia y se continuará con las otras casas. Las cuotas caducan al cabo de 1 hora; comprueba su precio actual en la casa. Si una lectura falla, se conservan los datos anteriores.</p></details>
+<details class="small" style="margin-top:16px"><summary>Sobre las cuotas</summary><p>1 y 2: mercados de 2 goles de ventaja. X: normal de RETAbet o mejorada de Bet365 cuando ofrecen mejor precio. Bet365 se consulta automáticamente. Si no se pueden obtener sus cuotas o las mejoradas, verás un aviso y la lectura continuará con las demás casas. Las cuotas caducan al cabo de 1 hora; comprueba su precio actual en la casa. Si una lectura falla, se conservan los datos anteriores.</p></details>
 
 {% if coverage %}<div class="panel"><h2 class="section-title">Partidos detectados y cobertura</h2><div class="subtle">Aquí puedes comprobar si las casas están viendo el mismo encuentro y qué cuotas utiliza el cruce.</div><div class="scroll"><table><thead><tr><th>Partido</th><th>Competición</th><th>Hora</th>{% for source,meta in source_defs.items() %}<th>{{meta.label}}</th>{% endfor %}</tr></thead><tbody>
 {% for c in coverage %}<tr><td><strong>{{c.home}} — {{c.away}}</strong>{% if c.time_warning %}<span class="srcmeta warn">{{c.time_warning}}</span>{% endif %}</td><td>{{c.league_label}}<span class="srcmeta">{{c.league}}</span></td><td>{{c.start_time}}</td>{% for source in source_defs %}{% set b=c.books[source] %}<td>{% if b.has_quote %}{% if b.available %}<span class="yes">✓</span>{% else %}<span class="warn">caducada</span>{% endif %} <span class="odds">{{'%.2f'|format(b.odds['1'])}} / {{'%.2f'|format(b.odds['X'])}} / {{'%.2f'|format(b.odds['2'])}}</span>{% if b.url %}<a class="open" href="{{b.url}}" target="_blank" rel="noopener">↗ abrir</a>{% endif %}<span class="srcmeta">{{b.origin}}</span>{% if b.market_labels.X %}<span class="srcmeta">X: {{b.market_labels.X}}</span>{% endif %}<span class="srcmeta">hora de esta casa: {{b.source_start}}</span><span class="srcmeta">Lectura: {{b.received_label}}</span>{% if b.updated %}<span class="srcmeta">dato: {{b.updated}}</span>{% endif %}{% if b.reason %}<span class="srcmeta warn">{{b.reason}}</span>{% endif %}{% else %}<span class="no">{% if source=='bet365' and cfg.bet365_mode=='web' %}sin lectura web vigente{% else %}sin 1X2 / no unido{% endif %}</span>{% if source=='bet365' and cfg.bet365_mode in ['auto','browser_auto'] %}<form method="post" action="/refresh-bet365"><input type="hidden" name="home" value="{{c.home}}"><input type="hidden" name="away" value="{{c.away}}"><button class="btn secondary">Buscar este partido</button></form>{% elif source=='bet365' and cfg.bet365_mode=='web' %}<br><a class="open" href="/bet365-extension">Activar lector</a>{% endif %}{% endif %}</td>{% endfor %}</tr>{% endfor %}
 </tbody></table></div></div>{% endif %}
 
 {% if rows %}<div class="panel"><h2 class="section-title">Mejores cruces</h2><div class="subtle">Ordenados por el mejor peor resultado. La apuesta al 1 queda fija y X/2 se optimizan a céntimos entre las asignaciones de tres casas distintas. Si las cuotas son desfavorables, minimizar la pérdida puede dar coberturas pequeñas y retornos desiguales.</div></div>
-{% for r in rows %}{% set b=r.best %}<div class="card"><div class="cardhead"><div><div class="match">{{r.home}} — {{r.away}}</div><div class="meta">{{r.league_label}} · {{r.start_time}}</div></div><div class="loss {% if b.worst_profit>=0 %}good{% elif b.loss<=0.50 %}good{% elif b.loss<=1.50 %}warn{% else %}bad{% endif %}">{% if b.worst_profit>=0 %}+{{'%.2f'|format(b.worst_profit)}} €{% else %}−{{'%.2f'|format(b.loss)}} €{% endif %}</div></div>
-<table><thead><tr><th>Signo</th><th>Casa</th><th class="num">Cuota</th><th class="num">Apostar</th><th class="num">Cobro</th></tr></thead><tbody>
-<tr><td><span class="tag">1</span></td><td>{{b.book1}}{% if b.market1 %}<span class="srcmeta">{{b.market1}}</span>{% endif %}{% if b.url1 %} <a class="open" href="{{b.url1}}" target="_blank">↗</a>{% endif %}</td><td class="num">{{'%.2f'|format(b.q1)}}</td><td class="num"><strong>{{'%.2f'|format(b.stake1)}} €</strong></td><td class="num">{{'%.2f'|format(b.return1)}} €</td></tr>
-<tr><td><span class="tag">X</span></td><td>{{b.bookX}}{% if b.marketX %}<span class="srcmeta">{{b.marketX}}</span>{% endif %}{% if b.urlX %} <a class="open" href="{{b.urlX}}" target="_blank">↗</a>{% endif %}</td><td class="num">{{'%.2f'|format(b.qX)}}</td><td class="num"><strong>{{'%.2f'|format(b.stakeX)}} €</strong></td><td class="num">{{'%.2f'|format(b.returnX)}} €</td></tr>
-<tr><td><span class="tag">2</span></td><td>{{b.book2}}{% if b.market2 %}<span class="srcmeta">{{b.market2}}</span>{% endif %}{% if b.url2 %} <a class="open" href="{{b.url2}}" target="_blank">↗</a>{% endif %}</td><td class="num">{{'%.2f'|format(b.q2)}}</td><td class="num"><strong>{{'%.2f'|format(b.stake2)}} €</strong></td><td class="num">{{'%.2f'|format(b.return2)}} €</td></tr></tbody></table>
-<div class="summary"><span>Total: <strong>{{'%.2f'|format(b.total)}} €</strong></span><span>Retorno mínimo: <strong>{{'%.2f'|format(b.min_return)}} €</strong></span><span>Peor caso: <strong>{{'%+.2f'|format(b.worst_profit)}} €</strong></span></div>
-<button type="button" class="btn secondary use-calculator" data-q1="{{b.q1}}" data-qx="{{b.qX}}" data-q2="{{b.q2}}" data-stake="{{b.stake1}}" data-match="{{r.home}} — {{r.away}}" style="margin-top:12px">Llevar a la calculadora</button>
-{% if r.alternatives|length>1 %}<details><summary>Ver otras asignaciones de casas</summary><table><thead><tr><th>1</th><th>X</th><th>2</th><th class="num">Peor caso</th></tr></thead><tbody>{% for a in r.alternatives[1:] %}<tr><td>{{a.book1}} @ {{'%.2f'|format(a.q1)}}</td><td>{{a.bookX}} @ {{'%.2f'|format(a.qX)}}{% if a.marketX %}<span class="srcmeta">{{a.marketX}}</span>{% endif %}</td><td>{{a.book2}} @ {{'%.2f'|format(a.q2)}}</td><td class="num">{{'%+.2f'|format(a.worst_profit)}} €</td></tr>{% endfor %}</tbody></table></details>{% endif %}</div>{% endfor %}
+{% for r in rows %}{% set b=r.best %}{% set match=r.home~' — '~r.away %}{% set key='cross-'~loop.index %}<div class="card">
+{{cross_calculator(b,key~'-best',match,r.league_label~' · '~r.start_time,true)}}
+{% if r.alternatives|length>1 %}<details><summary>Ver otras asignaciones de casas</summary><div class="scroll"><table><thead><tr><th>1</th><th>X</th><th>2</th><th class="num">Peor caso</th><th>Calcular</th></tr></thead><tbody>{% for a in r.alternatives[1:] %}{% set altkey=key~'-alt-'~loop.index %}<tr><td>{{a.book1}} @ {{'%.2f'|format(a.q1)}}</td><td>{{a.bookX}} @ {{'%.2f'|format(a.qX)}}{% if a.marketX %}<span class="srcmeta">{{a.marketX}}</span>{% endif %}</td><td>{{a.book2}} @ {{'%.2f'|format(a.q2)}}</td><td class="num">{{'%+.2f'|format(a.worst_profit)}} €</td><td><button class="btn secondary" type="button" data-inline-toggle="{{altkey}}-panel" aria-controls="{{altkey}}-panel" aria-expanded="false">Calcular aquí</button></td></tr>
+<tr class="alternative-panel" id="{{altkey}}-panel" hidden><td colspan="5"><template>{{cross_calculator(a,altkey,match)}}</template><div data-inline-host></div></td></tr>{% endfor %}</tbody></table></div></details>{% endif %}</div>{% endfor %}
 {% elif message and coverage %}<div class="panel empty">Hay partidos y cuotas, pero ninguno cumple la pérdida máxima configurada.</div>{% endif %}
 
 
@@ -85,6 +83,7 @@
 </div><script src="/static/scan_progress.js"></script><script>
 {
 let editingSettings=false;
+document.addEventListener('cruces-calculator-edit',()=>{editingSettings=true;});
 const updateForm=document.getElementById('update-quotes');
 let updating=false;
 const stopButton=document.getElementById('stop-update');
@@ -157,7 +156,7 @@ updateForm.addEventListener('submit',async event=>{
     document.addEventListener('cruces-bet365-refreshed',handler);
     document.dispatchEvent(new CustomEvent('cruces-refresh-bet365'));
   });
-  status.textContent=result?.ok ? `Bet365: ${result.captured} pestaña(s) leída(s). Actualizando otras casas…` : 'Bet365 no respondió con cuotas nuevas. Instala y activa el lector, abre el partido y usa esta app en el mismo Chrome o Edge.';
+  status.textContent=result?.ok ? `Bet365: ${result.captured} pestaña(s) leída(s). Actualizando otras casas…` : 'Bet365 no devolvió cuotas nuevas. Se mantienen las lecturas anteriores vigentes y se continúa con las otras casas.';
   const notice=document.createElement('input');notice.type='hidden';notice.name='bet365_reader_result';notice.value=result?.ok?'ok':'unavailable';updateForm.appendChild(notice);
   button.textContent='Actualizando…';
   updateForm.submit();
@@ -180,9 +179,9 @@ fetch('/update-status',{cache:'no-store'}).then(r=>r.json()).then(p=>{if(p.runni
     const timer=setTimeout(()=>{document.removeEventListener('cruces-reader-ready',handler);resolve(false);},8000);
     document.addEventListener('cruces-reader-ready',handler);
   });
-    if(!ready){status.textContent='Falta instalar el lector. Instálalo una sola vez y abre esta app en ese mismo Chrome o Edge. Abre Bet365 tú en una ventana normal del navegador antes de actualizar.';return;}
-    if(updateForm.dataset.direct==='1' && document.documentElement.dataset.crucesReaderVersion!=='2.1.6'){status.textContent='Recarga la extensión a la versión 2.1.6 y permite el acceso a las casas, incluido RETAbet.';return;}
-    if(!['1.8.0','1.9.0','1.9.1','2.1.6'].includes(document.documentElement.dataset.crucesReaderVersion)){status.textContent='Recarga la extensión a la versión 2.1.6 y después recarga esta pestaña. La búsqueda no se ha iniciado.';return;}
+    if(!ready){status.textContent='Falta instalar el lector. Instálalo una sola vez y abre esta app en ese mismo Chrome o Edge.';return;}
+    if(updateForm.dataset.direct==='1' && document.documentElement.dataset.crucesReaderVersion!=='2.1.7'){status.textContent='Recarga la extensión a la versión 2.1.7 y permite el acceso a las casas, incluido RETAbet.';return;}
+    if(!['1.8.0','1.9.0','1.9.1','2.1.7'].includes(document.documentElement.dataset.crucesReaderVersion)){status.textContent='Recarga la extensión a la versión 2.1.7 y después recarga esta pestaña. La búsqueda no se ha iniciado.';return;}
   status.textContent='Leyendo las casas seleccionadas. Espera a que termine…';
   let waitingForExisting=false;
   const progressTimer=setInterval(async()=>{
@@ -209,4 +208,4 @@ fetch('/update-status',{cache:'no-store'}).then(r=>r.json()).then(p=>{if(p.runni
 })();
 {% endif %}
 }
-</script><script src="/static/manual_calculator.js"></script>{% include 'app_updates.html' %}</body></html>
+</script><script src="/static/manual_calculator.js"></script><script src="/static/cross_calculator.js"></script>{% include 'app_updates.html' %}</body></html>

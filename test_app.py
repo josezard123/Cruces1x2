@@ -22,6 +22,36 @@ def q(source="bet365", home="Spain", away="Croatia", league="UEFA Nations League
 
 
 class AppTests(unittest.TestCase):
+    def test_cross_calculator_preserves_three_decimal_prices(self):
+        calc=a.optimized_stakes(10,2.1,6.255,3.4)
+        calc.update(q1=2.1,qX=6.255,q2=3.4,book1='A',bookX='B',book2='C',market1='',marketX='',market2='',url1='',urlX='',url2='')
+        with a.app.test_request_context('/'):
+            widget=str(a.app.jinja_env.get_template('cross_calculator.html').module.cross_calculator(calc,'precision','Partido'))
+        self.assertIn('value="6.255"',widget)
+        self.assertNotIn('value="6.25"',widget)
+
+    def test_cross_calculators_render_for_every_assignment(self):
+        from html.parser import HTMLParser
+        a.write_config({'max_loss':100})
+        response=a.app.test_client().get('/demo')
+        self.assertEqual(response.status_code,200)
+        html=response.data.decode()
+        self.assertEqual(html.count('data-cross-calculator role='),6)
+        self.assertEqual(html.count('data-inline-toggle='),5)
+        self.assertNotIn('Llevar a la calculadora',html)
+        self.assertIn('/static/cross_calculator.js',html)
+        self.assertIn('cruces-calculator-edit',html)
+        class Inputs(HTMLParser):
+            def __init__(self): super().__init__();self.ids=[];self.fields=[]
+            def handle_starttag(self,tag,attrs):
+                attrs=dict(attrs)
+                if 'id' in attrs:self.ids.append(attrs['id'])
+                if 'data-calc-field' in attrs:self.fields.append(attrs)
+        parsed=Inputs();parsed.feed(html)
+        self.assertEqual(len(parsed.ids),len(set(parsed.ids)))
+        self.assertEqual(len(parsed.fields),36)
+        self.assertTrue(all(field.get('value') and field.get('aria-label') for field in parsed.fields))
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         root = Path(self.tmp.name)

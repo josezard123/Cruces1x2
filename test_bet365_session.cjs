@@ -7,10 +7,11 @@ vm.createContext(ctx);vm.runInContext(fs.readFileSync('bet365_extension/backgrou
  assert.equal(created[0].windowId,9);assert.equal(created[0].active,false);
  windows=[{id:3,incognito:true,focused:true},{id:8,incognito:false,focused:false}];
  await ctx.createBet365Tab('https://www.bet365.es/#/AX/');assert.equal(created[1].windowId,8);
- windows=[{id:3,incognito:true}];await assert.rejects(ctx.createBet365Tab('https://www.bet365.es/#/AX/'),/ventana normal/);assert.equal(created.length,2);
- opened=[];await assert.rejects(ctx.createBet365Tab('https://www.bet365.es/#/AX/'),/Abre Bet365.*otras casas/);assert.equal(created.length,2);
- opened=[{id:3,windowId:3,incognito:true}];await assert.rejects(ctx.createBet365Tab('https://www.bet365.es/#/AX/'),/Abre Bet365/);assert.equal(created.length,2);
+ opened=[];windows=[{id:3,incognito:true,focused:true},{id:8,incognito:false,focused:false},{id:9,incognito:false,focused:true}];
+ await ctx.createBet365Tab('https://www.bet365.es/#/AX/');assert.equal(created[2].windowId,9);assert.equal(created[2].active,false);
+ opened=[{id:3,windowId:3,incognito:true}];await ctx.createBet365Tab('https://www.bet365.es/#/AX/');assert.equal(created[3].windowId,9);
+ windows=[{id:3,incognito:true}];await assert.rejects(ctx.createBet365Tab('https://www.bet365.es/#/AX/'),/No se pudieron obtener.*otras casas/);assert.equal(created.length,4);
  let response;listener({type:'bet365-observation',payload:{}},{url:'https://www.bet365.es/#/AC/',tab:{incognito:true}},result=>response=result);
  assert.equal(response.reason,'incognito');
- console.log('Bet365: el lector usa una ventana normal del mismo perfil y no importa capturas de incógnito ni maneja credenciales.');
+ console.log('Bet365: abre su propia pestaña si la casa está cerrada, prefiere la sesión existente y excluye incógnito sin pedir que se abra la casa.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

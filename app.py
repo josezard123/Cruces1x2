@@ -1651,7 +1651,7 @@ def update():
         source_stats: dict[str, Any] = {}
         warnings: list[str] = []
         if cfg["bet365_mode"] == "web" and request.form.get("bet365_reader_result") == "unavailable":
-            warnings.append("Bet365: el lector no devolvió cuotas nuevas. Instálalo y actívalo, abre el partido en Bet365 y utiliza la app en ese mismo Chrome o Edge. Solo se conservarán las lecturas anteriores que sigan vigentes.")
+            warnings.append("Bet365: no se pudieron obtener cuotas nuevas. Se conservan las lecturas anteriores vigentes y se continúa con las otras casas.")
         trace: list[dict[str, Any]] = []
         for source in ("winamax_es", "betfair_sb", "bet365"):
             check_update_cancelled()
