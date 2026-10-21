@@ -51,6 +51,19 @@ async function searchBetTeam(tabId,team,target,aliases) {
     return await selectBetTarget(tabId,target,aliases);
   }catch(_){return {ok:false,reason:'No se pudo cargar esta búsqueda de Bet365.'};}
 }
+function sportiumCatalogueObservation(event,target,now=Date.now()) {
+  const id=/^https:\/\/www\.sportium\.es\/apuestas\/sports\/soccer\/events\/(\d+)$/.exec(event.source_url||'')?.[1];
+  const observed=Date.parse(event.observed_at),start=Date.parse(event.start),expected=Date.parse(target.start);
+  if(!id||id!==event.event_id||event.market!=='FULL_TIME_1X2'||!event.league||!target.league_key||event.league_key!==target.league_key||
+    event.canonical_home!==target.canonical_home||event.canonical_away!==target.canonical_away||
+    !Number.isFinite(start)||!Number.isFinite(expected)||start<=now||Math.abs(start-expected)>900000||
+    !Number.isFinite(observed)||observed>now+1000||now-observed>120000)return null;
+  if(!event.odds||Object.keys(event.odds).sort().join(',')!=='1,2,X'||
+    ['1','X','2'].some(key=>typeof event.odds[key]!=='number'||!Number.isFinite(event.odds[key])||event.odds[key]<=1))return null;
+  return {ok:true,payload:{source_url:event.source_url,observed_at:event.observed_at,events:[{
+    home:event.home,away:event.away,league:event.league,event_id:id,start:event.start,market:event.market,odds:event.odds
+  }]}};
+}
 async function scanAutomatically(origin,filter={},source='bet365',continuing=false) {
   const cancelled=async()=> (await(await fetch(origin+'/update-status')).json()).cancelled===true;
   if(await cancelled())return {ok:false,captured:0,reason:'cancelled'};
@@ -103,9 +116,11 @@ async function scanAutomatically(origin,filter={},source='bet365',continuing=fal
             event.canonical_home===target.canonical_home&&event.canonical_away===target.canonical_away&&Math.abs(Date.parse(event.start)-Date.parse(target.start))<=900000);
           if(found.length!==1)selected={ok:false,reason:found.length?'Sportium tiene varios eventos con los mismos equipos y hora.':'Este partido no aparece con equipos y hora coincidentes en el catálogo de 48 horas de Sportium.'};
           else{
-            await chrome.tabs.update(tab.id,{url:found[0].source_url});
-            await waitForReader(tab.id,found[0].source_url);
-            selected={ok:true,verifiedStart:found[0].start,expectedEventId:found[0].event_id};
+            selected={ok:true,verifiedStart:found[0].start,expectedEventId:found[0].event_id,catalogueReading:sportiumCatalogueObservation(found[0],target)};
+            if(!selected.catalogueReading){
+              await chrome.tabs.update(tab.id,{url:found[0].source_url});
+              await waitForReader(tab.id,found[0].source_url);
+            }
           }
         }else {
           // Search the visitor immediately after the home team. A spelling
@@ -137,10 +152,15 @@ async function scanAutomatically(origin,filter={},source='bet365',continuing=fal
             requireUpcomingTarget(target);
             return readerTask(tab.id,{type:'read-target',target:readTarget,aliases:data.aliases},sportium?90000:Math.max(1,target.readDeadline-Date.now()+1000));
           };
-          await waitForReader(tab.id,undefined,target.readDeadline);
-          let result=await read().catch(()=>null);
+          let result=selected.catalogueReading;
+          if(!result){
+            if(await cancelled())break;
+            await waitForReader(tab.id,undefined,target.readDeadline);
+            result=await read().catch(()=>null);
+          }
           if(!result) {
             // A full document navigation closes the first message channel.
+            if(await cancelled())break;
             requireUpcomingTarget(target);await waitForReader(tab.id,undefined,target.readDeadline);
             result=await read();
           }

@@ -1,4 +1,4 @@
-LECTOR DE CUOTAS ES - CHROME / EDGE, versión 2.1.5
+LECTOR DE CUOTAS ES - CHROME / EDGE, versión 2.1.6
 
 Lee Bet365, Winamax ES, Betfair Sportsbook, Sportium ES, RETAbet ES y Betfair Exchange mediante el navegador.
 Instalación: abre chrome://extensions o edge://extensions, activa Modo desarrollador y carga descomprimida esta carpeta. Activa lectura en el icono Cruces.
@@ -8,7 +8,7 @@ Abre http://127.0.0.1:8802 en ese navegador. Chrome o Edge debe permanecer abier
 Actualizar cuotas lee las cinco casas. Winamax aporta las referencias de equipos, competición y hora. Cada lector usa su propia pestaña y la cierra al terminar. Las lecturas parciales conservan los datos anteriores.
 RETAbet: localiza los partidos en su catálogo, abre cada evento y guarda «1-X-2» y «1-X-2 / Ventaja 2 goles» por separado. No utiliza Ventaja 1 gol.
 Betfair Sportsbook: utiliza «Resultado — 2 Goles de Ventaja».
-Sportium: su cobertura depende del catálogo de 48 horas. Partidos ausentes o con fecha o equipos distintos quedan excluidos.
+Sportium: lee el 1-X-2 activo del catálogo de 48 horas y abre el evento solo si faltan esas cuotas. Partidos ausentes o con fecha, equipos o competición distintos quedan excluidos.
 Bet365: lee Resultado final y sus Cuotas mejoradas para Freebets y para X en Cruces.
 
 Freebets reutiliza las cuotas de la casa elegida. Actualizar Exchange y ordenar obtiene las cuotas en contra y su liquidez del catálogo público.

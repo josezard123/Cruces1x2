@@ -49,13 +49,13 @@ function finish(detail){
  scan=false;clearInterval(poll);$('fb-refresh').disabled=false;
  const reasons={empty:'No hay cuotas vigentes de esta casa; actualízalas en Cruces.',busy:'El lector está ocupado con otra búsqueda; espera a que termine.',disabled:'Activa la lectura desde el icono de la extensión.',connection:'No se pudo conectar con el lector del Exchange. Recarga la extensión y comprueba su permiso para Betfair.',market:'Exchange no mostró «Cuotas de partido».',layout:'El formato de las cuotas del Exchange no se pudo leer.',loading:'Exchange no cargó su tabla antes del límite de espera.',no_lay:'Exchange mostró partidos, pero no se pudieron leer sus cuotas lay activas.',teams:'Se leyeron cuotas del Exchange, pero sus equipos no coinciden con la casa.',time:'Se encontraron los equipos, pero la fecha u hora del Exchange no coincide con la casa.'};
  Object.assign(reasons,{date_format:'No se pudo interpretar la fecha mostrada por Exchange.',time_window:'Los partidos leídos del Exchange quedan fuera del intervalo prepartido.',lay_buttons:'Exchange no mostró botones lay activos en las filas leídas.',price_format:'No se pudo interpretar el formato de las cuotas o importes lay en euros.'});
- lastScanMessage=detail?.ok&&detail.captured?`Exchange: ${detail.captured} partidos leídos. ${detail.partial?'Cobertura parcial.':''}`:(reasons[detail?.reason]||'No se pudo completar la lectura del Exchange. Recarga el lector 2.1.5 y vuelve a probar.');
+ lastScanMessage=detail?.ok&&detail.captured?`Exchange: ${detail.captured} partidos leídos. ${detail.partial?'Cobertura parcial.':''}`:(reasons[detail?.reason]||'No se pudo completar la lectura del Exchange. Recarga el lector 2.1.6 y vuelve a probar.');
  $('fb-status').textContent=lastScanMessage;rank();
 }
 document.addEventListener('cruces-exchange-finished',event=>finish(event.detail));
 $('fb-refresh').addEventListener('click',()=>{
  if(scan)return;
- if(document.documentElement.dataset.crucesReaderVersion!=='2.1.5'){$('fb-status').textContent='Recarga el lector a versión 2.1.5 en Extensiones y después recarga esta página. La calculadora manual ya funciona.';return;}
+ if(document.documentElement.dataset.crucesReaderVersion!=='2.1.6'){$('fb-status').textContent='Recarga el lector a versión 2.1.6 en Extensiones y después recarga esta página. La calculadora manual ya funciona.';return;}
  scan=true;$('fb-refresh').disabled=true;$('fb-status').textContent='Iniciando lectura automática del Exchange…';
  const started=Date.now();poll=setInterval(async()=>{try{const data=await(await fetch('/freebets/status')).json();if(scan)$('fb-status').textContent=data.message+' '+data.captured+' partidos leídos.';}catch(_){}if(Date.now()-started>600000)finish({ok:false});},2000);
  document.dispatchEvent(new CustomEvent('cruces-read-exchange',{detail:{source:$('fb-house').value}}));

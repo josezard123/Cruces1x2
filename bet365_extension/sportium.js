@@ -76,6 +76,22 @@ function sportiumCompetitionKey(label) {
 function sportiumAllowedGroup(label,leagues=[]) {
   const key=sportiumCompetitionKey(label);return key!==null&&(!leagues.length||leagues.includes(key));
 }
+function sportiumListPrices(row,header) {
+  // The public coupon labels its three MRES columns 1 / X / 2. Other markets
+  // in the same row (totals, handicaps or enhanced prices) are never reused.
+  if(!header||!row.querySelectorAll||!/\s+1\s+X\s+2(?:\s|$)/i.test(header.innerText))return null;
+  const markets=[...row.querySelectorAll('.ta-MarketType-MRES')].filter(n=>n.getClientRects().length);
+  if(markets.length!==1)return null;
+  const selections=[...markets[0].querySelectorAll('.ta-SelectionButtonView')];
+  if(selections.length!==3)return null;
+  const prices=selections.map(n=>{
+    const text=n.querySelector('.ta-price_text')?.innerText.trim()||'';
+    const active=n.getClientRects().length>0&&!n.disabled&&n.getAttribute('aria-disabled')!=='true'&&!n.classList.contains('suspended');
+    return active&&/^\d+(?:[.,]\d+)?$/.test(text)?Number(text.replace(',','.')):NaN;
+  });
+  if(prices.some(n=>!Number.isFinite(n)||n<=1))return null;
+  return {'1':prices[0],'X':prices[1],'2':prices[2]};
+}
 function readSportiumCatalogue(leagues=[]) {
   const events=new Map();
   for(const row of document.querySelectorAll('.ta-EventListGroup .ta-EventListItem')) {
@@ -88,7 +104,14 @@ function readSportiumCatalogue(leagues=[]) {
     const teams=link.innerText.split('\n').map(s=>s.trim()).filter(Boolean);
     const date=row.innerText.split('\n').map(s=>s.trim()).find(s=>/^(Hoy|Mañana|\d{1,2}\s+(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)),?\s+\d{1,2}:\d{2}$/i.test(s));
     if(teams.length!==2||!date)continue;
-    events.set(href,{home:teams[0],away:teams[1],dateLabel:date.replace(',',''),source_url:'https://www.sportium.es'+href,event_id:href.split('/').pop()});
+    const event={home:teams[0],away:teams[1],dateLabel:date.replace(',',''),source_url:'https://www.sportium.es'+href,event_id:href.split('/').pop()};
+    const odds=sportiumListPrices(row,header);
+    if(odds){
+      event.league=header.innerText.trim().replace(/\s+1\s+X\s+2\b[\s\S]*$/i,'').trim();
+      event.league_key=sportiumCompetitionKey(event.league);
+      event.odds=odds;event.market='FULL_TIME_1X2';event.observed_at=new Date().toISOString();
+    }
+    events.set(href,event);
   }
   return [...events.values()];
 }

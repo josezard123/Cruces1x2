@@ -405,6 +405,38 @@ class AppTests(unittest.TestCase):
             payload['source_url']='https://example.com/events/19514722'
             self.assertEqual(client.post('/sportium-scan-observation',json=payload).status_code,400)
 
+    def test_sportium_catalogue_quotes_keep_capture_time_and_exact_reference(self):
+        a.write_config({'odds_mode':'browser_direct','bet365_mode':'browser_auto','selected_leagues':['ucl'],'hours':48})
+        pairs=[('Como','Como 1907','Manchester United','Man. United'),('Lille','Lille OSC','Galatasaray','Galatasaray'),
+               ('Bayern Múnich','Bayern M.','Arsenal','Arsenal FC'),('Aston Villa','Aston Villa','Viking','Viking FK'),
+               ('Inter Milán','Inter','Shakhtar Donetsk','Shakhtar Donetsk'),('Sporting Portugal','Sporting Lisboa','LASK','LASK Linz'),
+               ('Club Brujas','Club Brujas','Lens','RC Lens'),('Real Betis','Betis','Feyenoord','Feyenoord'),
+               ('Real Madrid','R. Madrid','RB Leipzig','RB Leipzig')]
+        refs=[q('winamax_es',home,away,'Champions League','Europa') for home,_,away,_ in pairs]
+        a._last_groups[:]=a.group_quotes({'winamax_es':refs},{'ucl'},48)
+        captured=(datetime.now(timezone.utc)-timedelta(seconds=30)).isoformat()
+        client=a.app.test_client()
+        with patch.object(a.requests,'get',side_effect=AssertionError('unexpected network')):
+            for index,((_,home,_,away),ref) in enumerate(zip(pairs,refs)):
+                payload={'source_url':f'https://www.sportium.es/apuestas/sports/soccer/events/{1000+index}',
+                         'observed_at':captured,'events':[{'event_id':str(1000+index),'home':home,'away':away,
+                         'league':'Champions League (Competiciones UEFA (Clubs))','start':ref.start.isoformat(),
+                         'market':'FULL_TIME_1X2','odds':{'1':2.15,'X':3.75,'2':3.00}}]}
+                self.assertEqual(client.post('/sportium-scan-observation',json=payload).status_code,200)
+            quotes,_=a.read_browser_web('sportium',48)
+            self.assertEqual(len(quotes),9)
+            self.assertTrue(all(quote.updated==captured and quote.odds['X']==3.75 for quote in quotes))
+            self.assertTrue(all('sportium' in group.quotes for group in a._last_groups))
+            payload['events'][0]['league']='Europa League'
+            self.assertEqual(client.post('/sportium-scan-observation',json=payload).status_code,400)
+            payload['events'][0]['league']='Champions League (Competiciones UEFA (Clubs))'
+            payload['events'][0]['start']=(refs[-1].start+timedelta(hours=1)).isoformat()
+            self.assertEqual(client.post('/sportium-scan-observation',json=payload).status_code,400)
+            before=a.SPORTIUM_BROWSER_PATH.read_bytes()
+            client.post('/stop-update')
+            self.assertEqual(client.post('/sportium-scan-observation',json=payload).status_code,409)
+            self.assertEqual(a.SPORTIUM_BROWSER_PATH.read_bytes(),before)
+
     def test_friendlies_aliases_and_sportium_group(self):
         groups=a.group_quotes({'winamax_es':[q('winamax_es','Jordania','Venezuela',league='Partidos amistosos internacionales')],
                               'bet365':[q('bet365','Jordan','Venezuela',league='International Match')],
