@@ -45,7 +45,11 @@ function readBet365VisibleMarket() {
   function extractMarket(names) {
   const titles=[...main.querySelectorAll('*')].filter(n=>!n.children.length && visible(n) &&
     names.includes((n.innerText?.trim().toLowerCase()||'').replace(/[–—]/g,'-').replace(/\s+/g,' ')));
-  const markets=titles.map(title=>{
+  // Opta information cards repeat market names alongside individual tips.
+  // Prefer the actual collapsible market headings, preserving the fallback for
+  // older layouts without semantic headings. Genuine duplicate markets still fail.
+  const headings=titles.filter(title=>title.closest?.('[role="button"],button,[role="heading"],h1,h2,h3,h4,h5,h6'));
+  const markets=(headings.length?headings:titles).map(title=>{
     for(let container=title.parentElement;container && container!==main;container=container.parentElement){
       if([...container.querySelectorAll('*')].some(n=>n!==title && !n.children.length && visible(n) &&
         /^(resultado final|full time result)/i.test(n.innerText?.trim()||'')))return null;

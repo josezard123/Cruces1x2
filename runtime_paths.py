@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 
-VERSION = '4.4.7'
+VERSION = '4.4.8'
 PACKAGED = bool(getattr(sys, 'frozen', False))
 RESOURCE_DIR = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
 
