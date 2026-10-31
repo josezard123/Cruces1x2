@@ -167,13 +167,14 @@ async function readCompleteSportiumCatalogue(leagues=[],warnings=[],targets=[],a
 function sportiumDiagnostic(phase) {
   try{return typeof publicReaderDiagnostic==='function'?publicReaderDiagnostic('sportium',phase):undefined;}catch(_){return undefined;}
 }
-async function sportiumCatalogue(aliases,leagues=[],targets=[]) {
+async function sportiumCatalogue(aliases,leagues=[],targets=[],snapshotOnly=false) {
   try {
     if(Intl.DateTimeFormat().resolvedOptions().timeZone!=='Europe/Madrid')throw new Error('Usa la zona horaria Europe/Madrid.');
     if(/access denied|acceso denegado|verify you are human|verifica que eres humano/i.test(document.body.innerText))return {ok:false,blocked:true,reason:'Sportium bloqueó el acceso; lectura detenida.'};
     await sportiumWait(()=>document.querySelector('.ta-EventListGroups .ta-GroupHeader'));
     const warnings=[];
-    const events=(await readCompleteSportiumCatalogue(leagues,warnings,targets,aliases)).flatMap(event=>{
+    const catalogue=snapshotOnly?readSportiumCatalogue(leagues):await readCompleteSportiumCatalogue(leagues,warnings,targets,aliases);
+    const events=catalogue.flatMap(event=>{
       try{return [{...event,start:sportiumStart(event.dateLabel),canonical_home:sportiumTeam(event.home,aliases),canonical_away:sportiumTeam(event.away,aliases)}];}catch{return [];}
     });
     return {ok:true,events,warnings,diagnostic:sportiumDiagnostic('catalogue')};
@@ -197,6 +198,7 @@ async function sportiumRead(target,aliases){
 }
 chrome.runtime.onMessage.addListener((message,sender,respond)=>{
   if(message.type==='reader-ping'){respond({ok:true,url:location.href});return false;}
+  if(message.type==='sportium-catalogue-snapshot'){sportiumCatalogue(message.aliases||{},Array.isArray(message.leagues)?message.leagues:[],[],true).then(respond);return true;}
   if(message.type==='sportium-catalogue'){sportiumCatalogue(message.aliases||{},Array.isArray(message.leagues)?message.leagues:[],Array.isArray(message.targets)?message.targets:[]).then(respond);return true;}
   if(message.type==='read-target'){sportiumRead(message.target,message.aliases).then(respond);return true;}
   return false;

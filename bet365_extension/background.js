@@ -63,6 +63,36 @@ function sportiumCatalogueObservation(event,target,now=Date.now()) {
     home:event.home,away:event.away,league:event.league,event_id:id,start:event.start,market:event.market,odds:event.odds
   }]}};
 }
+function sportiumReferencesCovered(listed,targets){
+  return listed?.ok&&Array.isArray(listed.events)&&targets.length>0&&targets.every(target=>
+    listed.events.filter(event=>sportiumCatalogueObservation(event,target)!==null).length===1);
+}
+async function sportiumLoadCatalogue(tab,task,cancelled,progress){
+  const snapshotTask={...task,type:'sportium-catalogue-snapshot'};
+  const snapshotRead=()=>readerTask(tab.id,snapshotTask,30000);
+  let snapshot;
+  try{snapshot=await snapshotRead();}
+  catch(error){
+    if(!/no respondió a tiempo|message (?:channel|port) closed|receiving end|could not establish connection/i.test(error.message||''))throw error;
+    snapshot={ok:false,source:'sportium',retryPublicLoad:true,reason:error.message};
+  }
+  snapshot=await retryEmptyPublicPage(tab,snapshot,snapshotRead,cancelled,progress);
+  if(snapshot?.blocked||await cancelled())return snapshot;
+  // Most single-league scans already have every verified price in the coupon.
+  if(sportiumReferencesCovered(snapshot,task.targets))return snapshot;
+  let listed;
+  try{listed=await readerTask(tab.id,task);}
+  catch(error){listed={ok:false,reason:error.message};}
+  if(listed?.blocked)return listed;
+  if(!listed?.ok){
+    if(snapshot?.ok&&snapshot.events?.length)return {...snapshot,warnings:[...(snapshot.warnings||[]),'Catálogo parcial de Sportium: se conservan las cuotas verificadas aunque el recorrido completo no respondiera.']};
+    return listed;
+  }
+  // Retain rows from the initial page even when later scrolling virtualizes them.
+  const current=listed.events||[],urls=new Set(current.map(event=>event.source_url));
+  const previous=(snapshot?.ok?snapshot.events||[]:[]).filter(event=>!urls.has(event.source_url));
+  return {...listed,events:[...previous,...current]};
+}
 async function scanAutomatically(origin,filter={},source='bet365',continuing=false) {
   const cancelled=async()=> (await(await fetch(origin+'/update-status')).json()).cancelled===true;
   if(await cancelled())return {ok:false,captured:0,reason:'cancelled'};
@@ -91,9 +121,9 @@ async function scanAutomatically(origin,filter={},source='bet365',continuing=fal
       await progress('Leyendo el catálogo público de Sportium (48 horas)');
       await waitForReader(tab.id);
       const task={type:'sportium-catalogue',aliases:data.aliases,leagues:data.leagues||[],targets:data.targets};
-      let listed=await readerTask(tab.id,task);
+      let listed=await sportiumLoadCatalogue(tab,task,cancelled,progress);
       await savePublicDiagnostic(origin,listed);
-      listed=await retryEmptyPublicPage(tab,listed,()=>readerTask(tab.id,task),cancelled,progress);
+      listed=await retryEmptyPublicPage(tab,listed,()=>sportiumLoadCatalogue(tab,task,cancelled,progress),cancelled,progress);
       await savePublicDiagnostic(origin,listed);
       if(!listed?.ok)throw new Error(listed?.reason||'No se pudo leer el catálogo público de Sportium.');
       catalogue=listed.events||[];
@@ -102,7 +132,7 @@ async function scanAutomatically(origin,filter={},source='bet365',continuing=fal
     for(const reference of data.targets) {
       if(await cancelled())break;
       if(Date.now()-started>600000){failures.push('Tiempo máximo alcanzado; cobertura parcial.');break;}
-      const target=sportium?reference:{...reference,readDeadline:Math.min(started+600000,Date.now()+75000)};
+      const target=sportium?reference:{...reference,readDeadline:Math.min(started+600000,Date.now()+105000)};
       const match=`${target.home} — ${target.away}`;
       await progress('Buscando '+match);
       let error='';
@@ -131,11 +161,11 @@ async function scanAutomatically(origin,filter={},source='bet365',continuing=fal
             if(await cancelled())break;
             requireUpcomingTarget(target);
             // Reserve time for the visitor and for reading the selected event.
-            const searchTarget={...target,readDeadline:Math.min(target.readDeadline,Date.now()+25000)};
+            const searchTarget={...target,readDeadline:Math.min(target.readDeadline,Date.now()+35000)};
             selected=await searchBetTeam(tab.id,team,searchTarget,data.aliases);
             await savePublicDiagnostic(origin,selected);
             if(Date.now()<searchTarget.readDeadline){
-              selected=await retryEmptyPublicPage(tab,selected,()=>selectBetTarget(tab.id,searchTarget,data.aliases),cancelled,progress);
+              selected=await retryEmptyPublicPage(tab,selected,()=>selectBetTarget(tab.id,searchTarget,data.aliases),cancelled,progress,searchTarget.readDeadline);
               await savePublicDiagnostic(origin,selected);
             }
             if(selected?.ok||selected?.blocked)break;
@@ -165,7 +195,7 @@ async function scanAutomatically(origin,filter={},source='bet365',continuing=fal
           }
           await savePublicDiagnostic(origin,result);
           if(!sportium){
-            result=await retryEmptyPublicPage(tab,result,read,cancelled,progress);
+            result=await retryEmptyPublicPage(tab,result,read,cancelled,progress,target.readDeadline);
             await savePublicDiagnostic(origin,result);
           }
           if(!result?.ok){

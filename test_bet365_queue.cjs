@@ -9,7 +9,7 @@ const ctx={Date:Clock,URL,setTimeout,clearTimeout,setInterval,clearInterval,impo
  readerTask:async(id,message)=>({ok:true,payload:{events:[{enhanced_odds:{X:4}}]}}),retryEmptyPublicPage:async(tab,result)=>result};
 vm.createContext(ctx);vm.runInContext(fs.readFileSync('bet365_extension/background.js','utf8'),ctx);
 ctx.createBet365Tab=async()=>({id:17});ctx.waitForReader=async()=>{};
-ctx.searchBetTeam=async(id,team,target)=>{searches.push(team);assert(target.readDeadline<=now+75000);
+ctx.searchBetTeam=async(id,team,target)=>{searches.push(team);assert(target.readDeadline<=now+105000);
  if(advance&&target.home===early.home){now=Date.parse(early.start)+1;return {ok:false};}return {ok:true};};
 (async()=>{
  now=Date.parse(early.start)+1;

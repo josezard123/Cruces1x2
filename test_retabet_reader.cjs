@@ -42,4 +42,15 @@ for(const change of [s=>s.markets.splice(0,1),s=>s.markets.push(structuredClone(
  const event=ctx.parseRetaEvent(copy,target,settings,now);assert.equal(event.normal_odds,undefined);assert.equal(event.odds.X,3.96);
 }
 for(const badURL of ['http://apuestas.retabet.es'+path,'https://other.example'+path,'https://user:password@apuestas.retabet.es'+path,url+'#account'])assert.equal(ctx.retaURL(badURL,true),null);
+const laLiga=ctx.retaCompetition('LaLiga','/deportes/futbol/espana/laliga/1');
+const racingRow={path:'/deportes/futbol/espana/laliga/racing-real-madrid/38626305',teams:['Racing','Real Madrid'],day:'Mañana',time:'16:15',live:'0'};
+const racingNow=new Date('2026-10-31T15:00:00Z'),racingSettings={...settings,leagues:['laliga']};
+const racingTarget=ctx.parseRetaCatalogue([racingRow],laLiga,racingSettings,racingNow)[0];
+assert.equal(racingTarget.home,'Racing Santander');assert.equal(racingTarget.start,'2026-11-01T15:15:00.000Z');
+const racingSnapshot={...snapshot,url:racingTarget.url,home:'Racing',away:'Real Madrid',date:['Mañana','16:15'],competitions:[{name:'LaLiga',path:laLiga.url}]};
+const racingQuote=ctx.parseRetaEvent(racingSnapshot,racingTarget,racingSettings,racingNow);
+assert.equal(racingQuote.home,'Racing Santander');assert.equal(racingQuote.payout,'two_goals');assert.equal(racingQuote.normal_odds.X,3.99);
+for(const comp of [competition,{...laLiga,key:'segunda'},{...laLiga,country:'Argentina'}])assert.equal(ctx.retaPublicTeam('Racing',comp),'Racing');
+assert.equal(ctx.retaPublicTeam('Racing U19',laLiga),'Racing U19');
+assert.throws(()=>ctx.parseRetaEvent({...racingSnapshot,home:'Racing U19'},racingTarget,racingSettings,racingNow));
 console.log('RETAbet: mercado de 2 goles separado del normal y de 1 gol, fechas Madrid, signos, equipos, suspensión, duplicados y dominio verificados.');

@@ -99,6 +99,7 @@ NATIONAL_POSITIVE = (
 )
 
 TEAM_ALIASES = {
+    "racing s":"racing santander",
     "malaga c f":"malaga", "malaga cf":"malaga",
     "r madrid":"real madrid", "r sociedad":"real sociedad", "ath bilbao":"athletic club", "r santander":"racing santander", "sevilla":"sevilla",
     "spain": "espana", "espana": "espana",

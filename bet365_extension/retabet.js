@@ -46,6 +46,11 @@ function retaDate(day,time,now=new Date()){
  if(!numeric[3]&&date<now-180*86400000)date=directMadridDate(++year,+numeric[2]-1,+numeric[1],+clock[1],+clock[2]);
  return date;
 }
+function retaPublicTeam(name,competition){
+ // RETAbet abbreviates Racing Santander to "Racing" in the Spanish LaLiga.
+ // Do not apply that ambiguous nickname to other leagues or to youth teams.
+ return competition?.key==='laliga'&&competition.country==='España'&&directClean(name)==='racing'?'Racing Santander':name;
+}
 function parseRetaCatalogue(rows,competition,settings,now=new Date()){
  const events=new Map();
  // RETAbet's Europa event slug ends in "league-", while its menu uses "league".
@@ -56,7 +61,7 @@ function parseRetaCatalogue(rows,competition,settings,now=new Date()){
   if(scope(url)!==scope(competition.url))continue;
   const start=retaDate(row.day,row.time,now);
   if(start<=now||start-now>settings.hours*3600000)continue;
-  events.set(url,{url,event_id:new URL(url).pathname.split('/').pop(),home:row.teams[0],away:row.teams[1],start:start.toISOString(),competition});
+  events.set(url,{url,event_id:new URL(url).pathname.split('/').pop(),home:retaPublicTeam(row.teams[0],competition),away:retaPublicTeam(row.teams[1],competition),start:start.toISOString(),competition});
  }catch(_){}}
  return [...events.values()];
 }
@@ -78,7 +83,8 @@ function retaEventSnapshot(){
 function parseRetaEvent(snapshot,target,settings,now=new Date()){
  const url=retaURL(snapshot.url,true);
  if(!url||url!==target.url||new URL(url).pathname.split('/').pop()!==target.event_id)throw Error('No coincide el evento de RETAbet.');
- if(directTeam(snapshot.home,settings.aliases)!==directTeam(target.home,settings.aliases)||directTeam(snapshot.away,settings.aliases)!==directTeam(target.away,settings.aliases))throw Error('Los equipos de RETAbet no coinciden.');
+ const home=retaPublicTeam(snapshot.home,target.competition),away=retaPublicTeam(snapshot.away,target.competition);
+ if(directTeam(home,settings.aliases)!==directTeam(target.home,settings.aliases)||directTeam(away,settings.aliases)!==directTeam(target.away,settings.aliases))throw Error('Los equipos de RETAbet no coinciden.');
  if(snapshot.date.length!==2)throw Error('Falta la fecha pública de RETAbet.');
  const start=retaDate(snapshot.date[0],snapshot.date[1],now);
  if(start<=now||start-now>settings.hours*3600000||!Number.isFinite(Date.parse(target.start))||Math.abs(+start-Date.parse(target.start))>60000)throw Error('La fecha de RETAbet no coincide con el partido prepartido.');
@@ -92,11 +98,11 @@ function parseRetaEvent(snapshot,target,settings,now=new Date()){
  const normalMarkets=snapshot.markets.filter(m=>directClean(m.title)==='1 x 2');
  let normal_odds;
  if(normalMarkets.length===1&&normalMarkets[0].selections.length===3&&normalMarkets[0].selections.every((s,i)=>s.name===['1','X','2'][i]))normal_odds=directPrices(normalMarkets[0].selections)||undefined;
- return {event_id:target.event_id,home:snapshot.home,away:snapshot.away,league:competitions[0].name,country:competitions[0].country,start:start.toISOString(),odds,...(normal_odds?{normal_odds}:{}),market:'FULL_TIME_1X2',payout:'two_goals',source_url:url};
+ return {event_id:target.event_id,home,away,league:competitions[0].name,country:competitions[0].country,start:start.toISOString(),odds,...(normal_odds?{normal_odds}:{}),market:'FULL_TIME_1X2',payout:'two_goals',source_url:url};
 }
 async function readRetaEvent(target,settings){
  await directWait(()=>{
-  const s=retaEventSnapshot();return s.date.length===2&&directTeam(s.home,settings.aliases)===directTeam(target.home,settings.aliases)&&directTeam(s.away,settings.aliases)===directTeam(target.away,settings.aliases)&&s.markets.length;
+  const s=retaEventSnapshot();return s.date.length===2&&directTeam(retaPublicTeam(s.home,target.competition),settings.aliases)===directTeam(target.home,settings.aliases)&&directTeam(retaPublicTeam(s.away,target.competition),settings.aliases)===directTeam(target.away,settings.aliases)&&s.markets.length;
  });
  let snapshot=retaEventSnapshot();
  for(const name of ['1 x 2 ventaja 2 goles','1 x 2']){

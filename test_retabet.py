@@ -26,6 +26,22 @@ class RetabetTests(unittest.TestCase):
         self.assertEqual(a.canonical_team('F.C. Barcelona'),a.canonical_team('FC Barcelona'))
         self.assertEqual(a.canonical_team('Celta'),a.canonical_team('Celta Vigo'))
         self.assertNotEqual(a.canonical_team('F.C. Barcelona U19'),a.canonical_team('FC Barcelona'))
+        self.assertEqual(a.canonical_team('Racing S.'),a.canonical_team('Racing De Santander'))
+        self.assertEqual(a.canonical_team('Athletic'),a.canonical_team('Athletic Bilbao'))
+        self.assertNotEqual(a.canonical_team('Racing'),a.canonical_team('Racing De Santander'))
+        self.assertNotEqual(a.canonical_team('Athletic U19'),a.canonical_team('Athletic Bilbao'))
+
+    def test_retabet_scoped_racing_name_joins_winamax_reference(self):
+        reference=test_direct.DirectTests.payload(self)
+        reference['events'][0].update(home='Racing De Santander',away='Real Madrid')
+        self.assertEqual(self.client.post('/direct-observation/winamax_es',json=reference).status_code,200)
+        payload=self.payload()
+        payload['events'][0].update(home='Racing Santander',away='Real Madrid',source_url='https://apuestas.retabet.es/deportes/futbol/espana/laliga/racing-real-madrid/456')
+        response=self.client.post('/direct-observation/retabet',json=payload)
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.json['captured'],1)
+        group=next(g for g in a._last_groups if 'retabet' in g.quotes)
+        self.assertIn('winamax_es',group.quotes)
 
     def test_market_import_join_restore_and_freebets(self):
         result=self.client.post('/direct-observation/retabet',json=self.payload())
